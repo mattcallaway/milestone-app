@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+
+# This is a stub workflow prepared for packaging desktop builds
+# To be completed in a future milestone
+
+jobs:
+  # Build desktop app for multiple platforms
+  build-desktop:
+    name: Build Desktop App
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/desktop
+        run: npm ci
+
+      - name: Build
+        working-directory: apps/desktop
+        run: npm run build
+
+      # TODO: Add electron-builder packaging step
+      # - name: Package
+      #   working-directory: apps/desktop
+      #   run: npm run package
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # TODO: Upload artifacts
+      # - name: Upload artifacts
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: desktop-${{ matrix.os }}
+      #     path: apps/desktop/dist/*
+
+  # Placeholder for backend deployment
+  deploy-backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    needs: build-desktop
+    if: false  # Disabled until deployment is configured
+
+    steps:
+      - name: Placeholder
+        run: echo "Backend deployment to be configured"
