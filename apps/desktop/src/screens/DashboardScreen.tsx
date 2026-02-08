@@ -182,6 +182,25 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
                             </div>
                         </div>
                     </section>
+
+                    {getCopyCounts()['1'] > 0 && (
+                        <section className="dashboard-section">
+                            <div
+                                className="backup-banner"
+                                onClick={() => onNavigate('items', { min_copies: 1, max_copies: 1 })}
+                            >
+                                <div className="backup-info">
+                                    <span className="backup-title">
+                                        ⚠️ {getCopyCounts()['1']} items have only 1 copy
+                                    </span>
+                                    <span className="backup-desc">
+                                        Click to view at-risk items and create backup copies
+                                    </span>
+                                </div>
+                                <span className="verification-arrow">→</span>
+                            </div>
+                        </section>
+                    )}
                 </>
             ) : null}
         </div>

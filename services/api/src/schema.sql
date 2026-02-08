@@ -77,3 +77,36 @@ CREATE TABLE IF NOT EXISTS media_item_files (
 CREATE INDEX IF NOT EXISTS idx_media_items_type ON media_items(type);
 CREATE INDEX IF NOT EXISTS idx_media_items_title ON media_items(title);
 CREATE INDEX IF NOT EXISTS idx_media_item_files_file ON media_item_files(file_id);
+
+-- operations: queued file operations (copy, move, delete)
+CREATE TABLE IF NOT EXISTS operations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,  -- 'copy', 'move', 'delete'
+    status TEXT DEFAULT 'pending',  -- pending, running, paused, completed, failed, cancelled
+    source_file_id INTEGER,
+    dest_drive_id INTEGER,
+    dest_path TEXT,
+    progress INTEGER DEFAULT 0,  -- bytes copied
+    total_size INTEGER,
+    verify_hash INTEGER DEFAULT 0,  -- whether to verify with full hash
+    error TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    FOREIGN KEY (source_file_id) REFERENCES files(id) ON DELETE SET NULL,
+    FOREIGN KEY (dest_drive_id) REFERENCES drives(id) ON DELETE SET NULL
+);
+
+-- user_rules: destination selection preferences
+CREATE TABLE IF NOT EXISTS user_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rule_type TEXT NOT NULL,  -- 'denylist', 'prefer_movie', 'prefer_tv', 'prefer_all'
+    drive_id INTEGER,
+    priority INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (drive_id) REFERENCES drives(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_operations_status ON operations(status);
+CREATE INDEX IF NOT EXISTS idx_operations_source ON operations(source_file_id);
+CREATE INDEX IF NOT EXISTS idx_user_rules_type ON user_rules(rule_type);

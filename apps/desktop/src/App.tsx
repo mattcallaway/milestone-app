@@ -7,8 +7,9 @@ import { ScanScreen } from './screens/ScanScreen';
 import { LibraryScreen } from './screens/LibraryScreen';
 import { ItemsScreen } from './screens/ItemsScreen';
 import { ItemDetailScreen } from './screens/ItemDetailScreen';
+import { OperationsScreen } from './screens/OperationsScreen';
 
-type Screen = 'dashboard' | 'drives' | 'roots' | 'scan' | 'library' | 'items' | 'item-detail';
+type Screen = 'dashboard' | 'drives' | 'roots' | 'scan' | 'library' | 'items' | 'item-detail' | 'operations';
 
 interface ScreenParams {
     itemId?: number;
@@ -58,6 +59,8 @@ function App() {
                         onBack={() => handleNavigate('items')}
                     />
                 );
+            case 'operations':
+                return <OperationsScreen />;
             default:
                 return <DashboardScreen onNavigate={handleNavigate} />;
         }

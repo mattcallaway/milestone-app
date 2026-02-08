@@ -247,4 +247,102 @@ export const api = {
     async getHealth(): Promise<{ status: string; write_mode: boolean }> {
         return request('GET', '/health');
     },
+
+    // Operations
+    async getOperations(params: {
+        status?: string;
+        type?: string;
+        page?: number;
+        page_size?: number;
+    } = {}): Promise<{ operations: Operation[]; total: number; page: number; page_size: number }> {
+        const query = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined) query.set(key, String(value));
+        });
+        return request('GET', `/ops?${query}`);
+    },
+
+    async getOperation(id: number): Promise<Operation> {
+        return request('GET', `/ops/${id}`);
+    },
+
+    async getQueueStatus(): Promise<QueueStatus> {
+        return request('GET', '/ops/queue/status');
+    },
+
+    async startQueue(): Promise<{ message: string; status: QueueStatus }> {
+        return request('POST', '/ops/queue/start');
+    },
+
+    async stopQueue(): Promise<{ message: string; status: QueueStatus }> {
+        return request('POST', '/ops/queue/stop');
+    },
+
+    async pauseQueue(): Promise<{ message: string; status: QueueStatus }> {
+        return request('POST', '/ops/queue/pause');
+    },
+
+    async resumeQueue(): Promise<{ message: string; status: QueueStatus }> {
+        return request('POST', '/ops/queue/resume');
+    },
+
+    async createCopy(params: {
+        source_file_id: number;
+        dest_drive_id?: number;
+        dest_path?: string;
+        verify_hash?: boolean;
+    }): Promise<{ message: string; operation: Operation }> {
+        return request('POST', '/ops/copy', params);
+    },
+
+    async createBatchCopy(params: {
+        media_item_id: number;
+        verify_hash?: boolean;
+    }): Promise<{ message: string; operations: Operation[]; errors: { file_id: number; error: string }[] }> {
+        return request('POST', '/ops/copy/batch', params);
+    },
+
+    async getDestinations(fileId: number): Promise<{ drives: Drive[] }> {
+        return request('GET', `/ops/destinations/${fileId}`);
+    },
+
+    async pauseOperation(id: number): Promise<{ message: string; id: number }> {
+        return request('POST', `/ops/${id}/pause`);
+    },
+
+    async resumeOperation(id: number): Promise<{ message: string; id: number }> {
+        return request('POST', `/ops/${id}/resume`);
+    },
+
+    async cancelOperation(id: number): Promise<{ message: string; id: number }> {
+        return request('POST', `/ops/${id}/cancel`);
+    },
 };
+
+// Operation types
+export interface Operation {
+    id: number;
+    type: 'copy' | 'move' | 'delete';
+    status: 'pending' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+    source_file_id: number | null;
+    source_path?: string;
+    dest_drive_id: number | null;
+    dest_path: string | null;
+    dest_drive_path?: string;
+    progress: number;
+    total_size: number | null;
+    verify_hash: boolean;
+    error: string | null;
+    created_at: string;
+    started_at: string | null;
+    completed_at: string | null;
+}
+
+export interface QueueStatus {
+    running: boolean;
+    paused: boolean;
+    concurrency: number;
+    active_count: number;
+    pending_count: number;
+    running_count: number;
+}
