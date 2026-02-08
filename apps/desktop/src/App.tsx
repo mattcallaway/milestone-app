@@ -8,8 +8,9 @@ import { LibraryScreen } from './screens/LibraryScreen';
 import { ItemsScreen } from './screens/ItemsScreen';
 import { ItemDetailScreen } from './screens/ItemDetailScreen';
 import { OperationsScreen } from './screens/OperationsScreen';
+import { CleanupScreen } from './screens/CleanupScreen';
 
-type Screen = 'dashboard' | 'drives' | 'roots' | 'scan' | 'library' | 'items' | 'item-detail' | 'operations';
+type Screen = 'dashboard' | 'drives' | 'roots' | 'scan' | 'library' | 'items' | 'item-detail' | 'operations' | 'cleanup';
 
 interface ScreenParams {
     itemId?: number;
@@ -61,6 +62,8 @@ function App() {
                 );
             case 'operations':
                 return <OperationsScreen />;
+            case 'cleanup':
+                return <CleanupScreen />;
             default:
                 return <DashboardScreen onNavigate={handleNavigate} />;
         }

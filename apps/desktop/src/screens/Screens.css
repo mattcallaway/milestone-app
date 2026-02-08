@@ -1110,3 +1110,167 @@
     font-size: 0.9rem;
     color: #888;
 }
+
+/* Cleanup Screen */
+
+.export-section {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.export-section h4 {
+    margin: 0 0 12px 0;
+    color: #e0e0e0;
+}
+
+.export-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.cleanup-summary {
+    background: linear-gradient(135deg, #1a2a3a 0%, #0d1922 100%);
+    border: 1px solid #2a3a4a;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.recommendations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.recommendation-card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.rec-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.rec-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.rec-type {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #888;
+    background: #2a2a2a;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.rec-meta {
+    display: flex;
+    gap: 16px;
+    color: #888;
+    font-size: 0.9rem;
+}
+
+.rec-meta .savings {
+    color: #4caf50;
+    font-weight: 600;
+}
+
+.rec-files {
+    display: flex;
+    gap: 20px;
+}
+
+.files-section {
+    flex: 1;
+    min-width: 0;
+}
+
+.files-section h5 {
+    margin: 0 0 8px 0;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.files-section.keep h5 {
+    color: #4caf50;
+}
+
+.files-section.delete h5 {
+    color: #ff9800;
+}
+
+.file-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: #0d0d0d;
+    border-radius: 6px;
+    margin-bottom: 4px;
+    font-size: 0.85rem;
+}
+
+.file-row.keep {
+    border-left: 3px solid #4caf50;
+}
+
+.file-row.delete {
+    border-left: 3px solid #ff9800;
+}
+
+.file-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.file-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.file-path {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #ccc;
+}
+
+.file-size {
+    color: #888;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+.file-drive {
+    color: #667eea;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

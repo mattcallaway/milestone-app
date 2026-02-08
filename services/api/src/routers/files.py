@@ -123,3 +123,68 @@ async def file_stats() -> dict:
             "total_size": total_size,
             "by_extension": ext_stats
         }
+
+
+@router.post("/{file_id}/open-explorer")
+async def open_in_explorer(file_id: int) -> dict:
+    """Open file location in Windows Explorer."""
+    import os
+    import subprocess
+    import sys
+    
+    async with get_db() as db:
+        cursor = await db.execute("SELECT path FROM files WHERE id = ?", (file_id,))
+        row = await cursor.fetchone()
+        
+        if not row:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        file_path = row["path"]
+        
+        if not os.path.exists(file_path):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="File does not exist on disk")
+        
+        # Open Explorer and select the file
+        if sys.platform == "win32":
+            subprocess.run(["explorer", "/select,", file_path])
+        elif sys.platform == "darwin":
+            subprocess.run(["open", "-R", file_path])
+        else:
+            # Linux - open folder containing file
+            subprocess.run(["xdg-open", os.path.dirname(file_path)])
+        
+        return {"status": "opened", "path": file_path}
+
+
+@router.post("/{file_id}/open-folder")
+async def open_folder(file_id: int) -> dict:
+    """Open the folder containing the file."""
+    import os
+    import subprocess
+    import sys
+    
+    async with get_db() as db:
+        cursor = await db.execute("SELECT path FROM files WHERE id = ?", (file_id,))
+        row = await cursor.fetchone()
+        
+        if not row:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        folder_path = os.path.dirname(row["path"])
+        
+        if not os.path.exists(folder_path):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Folder does not exist on disk")
+        
+        if sys.platform == "win32":
+            os.startfile(folder_path)
+        elif sys.platform == "darwin":
+            subprocess.run(["open", folder_path])
+        else:
+            subprocess.run(["xdg-open", folder_path])
+        
+        return {"status": "opened", "folder": folder_path}
+

@@ -11,6 +11,7 @@ const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'items', label: 'Items', icon: '🎬' },
     { id: 'operations', label: 'Operations', icon: '⚙️' },
+    { id: 'cleanup', label: 'Cleanup', icon: '🧹' },
     { id: 'drives', label: 'Drives', icon: '💾' },
     { id: 'roots', label: 'Roots', icon: '📁' },
     { id: 'scan', label: 'Scan', icon: '🔍' },

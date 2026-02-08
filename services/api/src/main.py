@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings, is_write_enabled
 from .database import init_db
-from .routers import drives, roots, files, scan, items, hash, ops
+from .routers import drives, roots, files, scan, items, hash, ops, cleanup, exports
 
 
 @asynccontextmanager
@@ -21,8 +21,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Milestone API",
-    description="File scanner backend with media grouping, hashing, and operations queue",
-    version="0.3.0",
+    description="File scanner with media grouping, operations queue, cleanup recommendations, and exports",
+    version="1.0.0",
     lifespan=lifespan,
 )
 
@@ -43,6 +43,8 @@ app.include_router(scan.router)
 app.include_router(items.router)
 app.include_router(hash.router)
 app.include_router(ops.router)
+app.include_router(cleanup.router)
+app.include_router(exports.router)
 
 
 @app.get("/")

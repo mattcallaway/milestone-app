@@ -346,3 +346,72 @@ export interface QueueStatus {
     pending_count: number;
     running_count: number;
 }
+
+// Cleanup types
+export interface CleanupFileToDelete {
+    id: number;
+    path: string;
+    size: number | null;
+    drive: string;
+}
+
+export interface CleanupRecommendation {
+    item_id: number;
+    title: string | null;
+    type: string;
+    total_copies: number;
+    keep_count: number;
+    delete_count: number;
+    savings_bytes: number;
+    files_to_delete: CleanupFileToDelete[];
+    files_to_keep: { id: number; path: string; drive: string }[];
+}
+
+export interface CleanupRecommendationsResponse {
+    recommendations: CleanupRecommendation[];
+    total_items: number;
+    total_files_to_delete: number;
+    total_savings_bytes: number;
+    total_savings_gb: number;
+}
+
+// Cleanup API
+export const cleanupApi = {
+    async getRecommendations(minCopies: number = 3): Promise<CleanupRecommendationsResponse> {
+        return request('GET', `/cleanup/recommendations?min_copies=${minCopies}`);
+    },
+
+    async quarantineFiles(fileIds: number[]): Promise<{
+        moved: number;
+        errors: number;
+        files: { file_id: number; original_path: string; quarantine_path: string }[];
+        error_details: { file_id: number; error: string }[];
+    }> {
+        return request('POST', '/cleanup/quarantine', { file_ids: fileIds });
+    },
+
+    async restoreFiles(fileIds: number[]): Promise<{
+        restored: number;
+        errors: number;
+        files: { file_id: number; restored_path: string }[];
+        error_details: { file_id: number; error: string }[];
+    }> {
+        return request('POST', '/cleanup/restore', fileIds);
+    },
+
+    async openInExplorer(fileId: number): Promise<{ status: string; path: string }> {
+        return request('POST', `/files/${fileId}/open-explorer`);
+    },
+
+    async openFolder(fileId: number): Promise<{ status: string; folder: string }> {
+        return request('POST', `/files/${fileId}/open-folder`);
+    },
+};
+
+// Export functions (download CSV files)
+export const exportApi = {
+    getAtRiskUrl: () => `${API_BASE}/exports/at-risk`,
+    getInventoryUrl: () => `${API_BASE}/exports/inventory`,
+    getDuplicatesUrl: () => `${API_BASE}/exports/duplicates`,
+};
+
