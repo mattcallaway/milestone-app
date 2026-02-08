@@ -9,8 +9,11 @@ import { ItemsScreen } from './screens/ItemsScreen';
 import { ItemDetailScreen } from './screens/ItemDetailScreen';
 import { OperationsScreen } from './screens/OperationsScreen';
 import { CleanupScreen } from './screens/CleanupScreen';
+import { DomainsScreen } from './screens/DomainsScreen';
+import { SimulationScreen } from './screens/SimulationScreen';
+import { PlanScreen } from './screens/PlanScreen';
 
-type Screen = 'dashboard' | 'drives' | 'roots' | 'scan' | 'library' | 'items' | 'item-detail' | 'operations' | 'cleanup';
+type Screen = 'dashboard' | 'drives' | 'roots' | 'scan' | 'library' | 'items' | 'item-detail' | 'operations' | 'cleanup' | 'domains' | 'simulation' | 'plans';
 
 interface ScreenParams {
     itemId?: number;
@@ -64,6 +67,12 @@ function App() {
                 return <OperationsScreen />;
             case 'cleanup':
                 return <CleanupScreen />;
+            case 'domains':
+                return <DomainsScreen />;
+            case 'simulation':
+                return <SimulationScreen />;
+            case 'plans':
+                return <PlanScreen />;
             default:
                 return <DashboardScreen onNavigate={handleNavigate} />;
         }

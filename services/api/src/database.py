@@ -21,6 +21,10 @@ async def init_db() -> None:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.executescript(schema)
         await db.commit()
+    
+    # Run v1.1.0 migrations for existing DBs
+    from .migrations.v110 import migrate_v110
+    await migrate_v110(str(DB_PATH))
 
 
 @asynccontextmanager

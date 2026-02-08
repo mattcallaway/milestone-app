@@ -110,3 +110,69 @@ CREATE TABLE IF NOT EXISTS user_rules (
 CREATE INDEX IF NOT EXISTS idx_operations_status ON operations(status);
 CREATE INDEX IF NOT EXISTS idx_operations_source ON operations(source_file_id);
 CREATE INDEX IF NOT EXISTS idx_user_rules_type ON user_rules(rule_type);
+
+-- ============================================
+-- v1.1.0 Enhancements (backward-compatible)
+-- ============================================
+
+-- failure_domains: groups of drives sharing failure risk
+CREATE TABLE IF NOT EXISTS failure_domains (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    domain_type TEXT DEFAULT 'enclosure',  -- 'enclosure', 'nas', 'location', 'power'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- io_settings: global I/O throttling configuration
+CREATE TABLE IF NOT EXISTS io_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),  -- singleton row
+    max_concurrent INTEGER DEFAULT 2,
+    max_mbps INTEGER DEFAULT 50,
+    cooldown_ms INTEGER DEFAULT 0,
+    preset TEXT DEFAULT 'balanced'  -- 'night', 'balanced', 'fast'
+);
+INSERT OR IGNORE INTO io_settings (id) VALUES (1);
+
+-- sidecars: associated files (subtitles, nfo, posters)
+CREATE TABLE IF NOT EXISTS sidecars (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    primary_file_id INTEGER NOT NULL,
+    sidecar_file_id INTEGER NOT NULL,
+    sidecar_type TEXT,  -- 'subtitle', 'nfo', 'poster', 'fanart'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (primary_file_id) REFERENCES files(id) ON DELETE CASCADE,
+    FOREIGN KEY (sidecar_file_id) REFERENCES files(id) ON DELETE CASCADE,
+    UNIQUE(primary_file_id, sidecar_file_id)
+);
+
+-- plans: preview containers for bulk operations
+CREATE TABLE IF NOT EXISTS plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    plan_type TEXT NOT NULL,  -- 'copy', 'reduction'
+    status TEXT DEFAULT 'draft',  -- 'draft', 'confirmed', 'executed', 'cancelled'
+    total_bytes INTEGER DEFAULT 0,
+    item_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    confirmed_at TIMESTAMP,
+    executed_at TIMESTAMP
+);
+
+-- plan_items: individual actions within a plan
+CREATE TABLE IF NOT EXISTS plan_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id INTEGER NOT NULL,
+    action TEXT NOT NULL,  -- 'copy', 'delete', 'move'
+    source_file_id INTEGER,
+    dest_drive_id INTEGER,
+    dest_path TEXT,
+    included INTEGER DEFAULT 1,  -- user can toggle off
+    FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE,
+    FOREIGN KEY (source_file_id) REFERENCES files(id) ON DELETE SET NULL,
+    FOREIGN KEY (dest_drive_id) REFERENCES drives(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sidecars_primary ON sidecars(primary_file_id);
+CREATE INDEX IF NOT EXISTS idx_plan_items_plan ON plan_items(plan_id);
+
