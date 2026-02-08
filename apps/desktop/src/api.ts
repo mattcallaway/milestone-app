@@ -4,11 +4,6 @@
 
 const API_BASE = 'http://127.0.0.1:8000';
 
-interface ApiResponse<T> {
-    data?: T;
-    error?: string;
-}
-
 async function request<T>(
     method: string,
     path: string,
@@ -62,6 +57,9 @@ export interface FileItem {
     mtime: number | null;
     ext: string | null;
     last_seen: string | null;
+    quick_sig?: string | null;
+    full_hash?: string | null;
+    hash_status?: string;
 }
 
 export interface ScanStatus {
@@ -80,6 +78,48 @@ export interface FileStats {
     total_files: number;
     total_size: number;
     by_extension: { ext: string; count: number; size: number }[];
+}
+
+export interface MediaItem {
+    id: number;
+    type: 'movie' | 'tv_episode' | 'unknown';
+    title: string | null;
+    year: number | null;
+    season: number | null;
+    episode: number | null;
+    status: 'auto' | 'verified' | 'needs_verification';
+    created_at: string;
+    copy_count: number;
+}
+
+export interface MediaItemDetail extends MediaItem {
+    files: {
+        id: number;
+        path: string;
+        size: number | null;
+        ext: string | null;
+        quick_sig: string | null;
+        full_hash: string | null;
+        hash_status: string;
+        is_primary: boolean;
+        root_path: string;
+        drive_path: string;
+    }[];
+}
+
+export interface ItemStats {
+    total_items: number;
+    by_type: Record<string, number>;
+    by_copy_count: Record<number, number>;
+    needs_verification: number;
+}
+
+export interface HashStatus {
+    state: 'idle' | 'running' | 'complete' | 'stopped';
+    files_total: number;
+    files_processed: number;
+    current_file: string | null;
+    queue_size: number;
 }
 
 // API functions
@@ -129,15 +169,7 @@ export const api = {
     },
 
     // Files
-    async getFiles(params: {
-        root_id?: number;
-        ext?: string;
-        min_size?: number;
-        max_size?: number;
-        path_contains?: string;
-        page?: number;
-        page_size?: number;
-    } = {}): Promise<{ files: FileItem[]; total: number; page: number; page_size: number }> {
+    async getFiles(params: Record<string, unknown> = {}): Promise<{ files: FileItem[]; total: number; page: number; page_size: number }> {
         const query = new URLSearchParams();
         Object.entries(params).forEach(([key, value]) => {
             if (value !== undefined) query.set(key, String(value));
@@ -147,6 +179,68 @@ export const api = {
 
     async getFileStats(): Promise<FileStats> {
         return request('GET', '/files/stats');
+    },
+
+    // Media Items
+    async getItems(params: {
+        type?: string;
+        min_copies?: number;
+        max_copies?: number;
+        status?: string;
+        search?: string;
+        page?: number;
+        page_size?: number;
+    } = {}): Promise<{ items: MediaItem[]; total: number; page: number; page_size: number }> {
+        const query = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined) query.set(key, String(value));
+        });
+        return request('GET', `/items?${query}`);
+    },
+
+    async getItem(id: number): Promise<MediaItemDetail> {
+        return request('GET', `/items/${id}`);
+    },
+
+    async getItemStats(): Promise<ItemStats> {
+        return request('GET', '/items/stats');
+    },
+
+    async mergeItems(targetId: number, sourceIds: number[]): Promise<{ target_id: number; files_moved: number; items_merged: number }> {
+        return request('POST', `/items/merge?target_id=${targetId}`, sourceIds);
+    },
+
+    async splitFile(fileId: number): Promise<{ old_item_id: number; new_item_id: number; file_id: number }> {
+        return request('POST', `/items/split?file_id=${fileId}`);
+    },
+
+    async processItems(): Promise<{ processed: number; new_items: number; linked: number; skipped: number }> {
+        return request('POST', '/items/process');
+    },
+
+    async updateItem(id: number, updates: Partial<Pick<MediaItem, 'title' | 'year' | 'season' | 'episode' | 'type'>>): Promise<{ message: string; id: number }> {
+        const query = new URLSearchParams();
+        Object.entries(updates).forEach(([key, value]) => {
+            if (value !== undefined) query.set(key, String(value));
+        });
+        return request('PATCH', `/items/${id}?${query}`);
+    },
+
+    // Hashing
+    async startHashing(fileIds?: number[]): Promise<{ message: string; status: HashStatus }> {
+        return request('POST', '/hash/compute', fileIds);
+    },
+
+    async getHashStatus(): Promise<HashStatus> {
+        return request('GET', '/hash/status');
+    },
+
+    async stopHashing(): Promise<{ stopped: boolean }> {
+        return request('POST', '/hash/stop');
+    },
+
+    async hashFile(fileId: number): Promise<{ file_id: number; quick_sig: string | null; full_hash: string | null; status: string }> {
+        return request('POST', `/hash/file/${fileId}`);
     },
 
     // Health

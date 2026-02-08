@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode } from 'react';
 import './Layout.css';
 
 interface LayoutProps {
@@ -8,6 +8,8 @@ interface LayoutProps {
 }
 
 const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { id: 'items', label: 'Items', icon: '🎬' },
     { id: 'drives', label: 'Drives', icon: '💾' },
     { id: 'roots', label: 'Roots', icon: '📁' },
     { id: 'scan', label: 'Scan', icon: '🔍' },
