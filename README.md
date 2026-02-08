@@ -1,6 +1,15 @@
 # Milestone App
 
-A monorepo containing a desktop application (Electron + React) and backend API (Python FastAPI).
+A media file management system with failure domain tracking, bulk planning, and drive simulation.
+
+## Features (v1.1.0)
+
+- **Failure Domains**: Group drives by shared risk (enclosure, NAS, location). Items need copies in 2+ domains to be safe.
+- **Drive Simulation**: Analyze what happens if drives fail—no writes, purely analytical.
+- **Bulk Planning**: Create copy/reduction plans, review before executing.
+- **Cleanup Recommendations**: Find over-replicated items, quarantine extras.
+- **CSV Exports**: At-risk items, full inventory, duplicates.
+- **Operations Queue**: Safe copy with verification.
 
 ## Prerequisites
 
