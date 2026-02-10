@@ -2,7 +2,6 @@
 
 import os
 import shutil
-import hashlib
 import asyncio
 from typing import Optional, Callable
 from pathlib import Path
@@ -92,7 +91,7 @@ async def safe_copy(
         if temp_dest.exists():
             try:
                 temp_dest.unlink()
-            except:
+            except OSError:
                 pass
         raise
 
@@ -177,7 +176,7 @@ async def get_destination_drives(
                 
                 drive["free_space"] = free_space
                 drive["total_space"] = stat.total
-            except:
+            except OSError:
                 continue  # Skip drives we can't access
             
             # Score: preferred drives get boost

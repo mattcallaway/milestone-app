@@ -1,6 +1,10 @@
 """Database migration for v1.1.0 schema additions."""
 
+import logging
+
 import aiosqlite
+
+logger = logging.getLogger(__name__)
 
 
 async def migrate_v110(db_path: str):
@@ -58,7 +62,7 @@ async def migrate_v110(db_path: str):
             pass
         
         await db.commit()
-        print("v1.1.0 migration complete")
+        logger.info("v1.1.0 migration complete")
 
 
 if __name__ == "__main__":

@@ -222,7 +222,8 @@ async def run_scan(drive_id: Optional[int], throttle: ThrottleLevel) -> None:
         })
         
     except Exception as e:
-        _scan_state = ScanState.IDLE
+        _scan_state = ScanState.CANCELLED
+        _scan_status["state"] = ScanState.CANCELLED
         log_event("scan_error", {"error": str(e)})
         raise
 

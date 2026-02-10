@@ -54,9 +54,11 @@ async def list_items(
         # Apply copy count filters in HAVING
         having_conditions = []
         if min_copies is not None:
-            having_conditions.append(f"copy_count >= {min_copies}")
+            having_conditions.append("copy_count >= ?")
+            params.append(min_copies)
         if max_copies is not None:
-            having_conditions.append(f"copy_count <= {max_copies}")
+            having_conditions.append("copy_count <= ?")
+            params.append(max_copies)
         
         if having_conditions:
             query += " HAVING " + " AND ".join(having_conditions)

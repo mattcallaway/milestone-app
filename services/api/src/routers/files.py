@@ -1,6 +1,6 @@
 """Files API router."""
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from ..database import get_db
 from ..models import FileItem, FileList
@@ -131,19 +131,16 @@ async def open_in_explorer(file_id: int) -> dict:
     import os
     import subprocess
     import sys
-    
     async with get_db() as db:
         cursor = await db.execute("SELECT path FROM files WHERE id = ?", (file_id,))
         row = await cursor.fetchone()
         
         if not row:
-            from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="File not found")
         
         file_path = row["path"]
         
         if not os.path.exists(file_path):
-            from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="File does not exist on disk")
         
         # Open Explorer and select the file
@@ -170,13 +167,11 @@ async def open_folder(file_id: int) -> dict:
         row = await cursor.fetchone()
         
         if not row:
-            from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="File not found")
         
         folder_path = os.path.dirname(row["path"])
         
         if not os.path.exists(folder_path):
-            from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="Folder does not exist on disk")
         
         if sys.platform == "win32":

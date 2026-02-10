@@ -1,7 +1,6 @@
 """Queue engine for processing file operations."""
 
 import asyncio
-import threading
 from typing import Optional, Callable
 from datetime import datetime
 from .database import get_db
