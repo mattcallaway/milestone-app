@@ -1,5 +1,29 @@
 # Changelog
 
+## [v1.1.1-audit] - 2026-02-08
+
+### Stability & Audit Pass
+
+**Critical Fixes**
+- Fixed SQL string interpolation in `items.py` HAVING clause → parameterized queries
+- Fixed scanner error state set to IDLE instead of CANCELLED on exceptions
+
+**Warning Fixes**
+- Replaced bare `except:` with `except OSError:` in `copier.py`
+- Removed dead `get_db_connection()` function that leaked resources (`database.py`)
+- Hoisted redundant internal `HTTPException` imports to module level (`files.py`)
+- Replaced `print()` with proper `logging` in migration script (`v110.py`)
+
+**Cleanup**
+- Removed unused `threading` import (`queue.py`)
+- Removed unused `hashlib` import (`copier.py`)
+- Removed unused `get_settings` import (`database.py`)
+
+**Documentation**
+- Added `AUDIT_REPORT.md` with full findings, severity, and justifications
+
+---
+
 ## [v1.1.0] - 2026-02-08
 
 ### Added
