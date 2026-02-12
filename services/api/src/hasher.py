@@ -35,7 +35,7 @@ def compute_quick_signature(filepath: str) -> Optional[str]:
         with open(filepath, 'rb') as f:
             # Read first chunk
             first_chunk = f.read(QUICK_SIG_SIZE)
-            first_hash = hashlib.md5(first_chunk).hexdigest()[:16]
+            first_hash = hashlib.md5(first_chunk, usedforsecurity=False).hexdigest()[:16]
             
             # Read last chunk (may overlap with first for small files)
             if size > QUICK_SIG_SIZE:
@@ -43,7 +43,7 @@ def compute_quick_signature(filepath: str) -> Optional[str]:
                 last_chunk = f.read(QUICK_SIG_SIZE)
             else:
                 last_chunk = first_chunk
-            last_hash = hashlib.md5(last_chunk).hexdigest()[:16]
+            last_hash = hashlib.md5(last_chunk, usedforsecurity=False).hexdigest()[:16]
         
         return f"{size}:{first_hash}:{last_hash}"
     except (OSError, PermissionError):
@@ -120,21 +120,22 @@ async def run_hash_queue() -> None:
     _hash_status["files_total"] = len(_hash_queue)
     _hash_status["files_processed"] = 0
     
-    while _hash_queue and _hash_running:
-        file_id = _hash_queue.pop(0)
-        
-        async with get_db() as db:
-            cursor = await db.execute("SELECT path FROM files WHERE id = ?", (file_id,))
-            row = await cursor.fetchone()
-            if row:
-                _hash_status["current_file"] = row["path"]
-        
-        await hash_file(file_id)
-        _hash_status["files_processed"] += 1
-    
-    _hash_running = False
-    _hash_status["state"] = "complete" if not _hash_queue else "stopped"
-    _hash_status["current_file"] = None
+    try:
+        while _hash_queue and _hash_running:
+            file_id = _hash_queue.pop(0)
+            
+            async with get_db() as db:
+                cursor = await db.execute("SELECT path FROM files WHERE id = ?", (file_id,))
+                row = await cursor.fetchone()
+                if row:
+                    _hash_status["current_file"] = row["path"]
+            
+            await hash_file(file_id)
+            _hash_status["files_processed"] += 1
+    finally:
+        _hash_running = False
+        _hash_status["state"] = "complete" if not _hash_queue else "error"
+        _hash_status["current_file"] = None
 
 
 def start_hash_computation(file_ids: Optional[list[int]] = None) -> bool:

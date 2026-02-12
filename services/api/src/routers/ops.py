@@ -84,60 +84,43 @@ async def list_operations(
 @router.get("/queue/status")
 async def queue_status_endpoint() -> dict:
     """Get queue status."""
-    status = get_queue_status()
-    
-    async with get_db() as db:
-        # Count pending operations
-        cursor = await db.execute(
-            "SELECT COUNT(*) as count FROM operations WHERE status = 'pending'"
-        )
-        pending = (await cursor.fetchone())["count"]
-        
-        cursor = await db.execute(
-            "SELECT COUNT(*) as count FROM operations WHERE status = 'running'"
-        )
-        running = (await cursor.fetchone())["count"]
-    
-    return {
-        **status,
-        "pending_count": pending,
-        "running_count": running
-    }
+    status = await get_queue_status()
+    return status
 
 
 @router.post("/queue/start")
 async def start_queue_endpoint() -> dict:
     """Start the queue worker."""
     start_queue()
-    return {"message": "Queue started", "status": get_queue_status()}
+    return {"message": "Queue started", "status": await get_queue_status()}
 
 
 @router.post("/queue/stop")
 async def stop_queue_endpoint() -> dict:
     """Stop the queue worker."""
     stop_queue()
-    return {"message": "Queue stopped", "status": get_queue_status()}
+    return {"message": "Queue stopped", "status": await get_queue_status()}
 
 
 @router.post("/queue/pause")
 async def pause_queue_endpoint() -> dict:
     """Pause queue processing."""
     pause_queue()
-    return {"message": "Queue paused", "status": get_queue_status()}
+    return {"message": "Queue paused", "status": await get_queue_status()}
 
 
 @router.post("/queue/resume")
 async def resume_queue_endpoint() -> dict:
     """Resume queue processing."""
     resume_queue()
-    return {"message": "Queue resumed", "status": get_queue_status()}
+    return {"message": "Queue resumed", "status": await get_queue_status()}
 
 
 @router.post("/queue/concurrency")
 async def set_concurrency_endpoint(limit: int = Query(2, ge=1, le=10)) -> dict:
     """Set queue concurrency limit."""
     set_concurrency(limit)
-    return {"message": f"Concurrency set to {limit}", "status": get_queue_status()}
+    return {"message": f"Concurrency set to {limit}", "status": await get_queue_status()}
 
 
 @router.get("/{op_id}")

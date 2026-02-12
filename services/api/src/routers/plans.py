@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from ..database import get_db
+from ..config import is_write_enabled
 
 
 router = APIRouter(prefix="/plans", tags=["plans"])
@@ -231,6 +232,10 @@ async def create_reduction_plan(data: PlanCreate, min_copies: int = 2) -> dict:
 async def toggle_plan_item(plan_id: int, item_id: int, included: bool) -> dict:
     """Toggle whether a plan item is included."""
     async with get_db() as db:
+        cursor = await db.execute("SELECT status FROM plans WHERE id = ?", (plan_id,))
+        plan = await cursor.fetchone()
+        if not plan or plan["status"] != "draft":
+            raise HTTPException(status_code=400, detail="Can only modify draft plans")
         await db.execute(
             "UPDATE plan_items SET included = ? WHERE id = ? AND plan_id = ?",
             (1 if included else 0, item_id, plan_id)
@@ -245,6 +250,8 @@ async def confirm_plan(plan_id: int) -> dict:
     Confirm a plan and convert to queued operations.
     Only included items are converted.
     """
+    if not is_write_enabled():
+        raise HTTPException(status_code=403, detail="Write mode is not enabled")
     async with get_db() as db:
         cursor = await db.execute(
             "SELECT * FROM plans WHERE id = ? AND status = 'draft'",

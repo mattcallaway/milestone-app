@@ -16,13 +16,26 @@ _queue_state = {
 }
 
 
-def get_queue_status() -> dict:
+async def get_queue_status() -> dict:
     """Get current queue status."""
+    active = len(_queue_state["active_ops"])
+    pending = 0
+    try:
+        async with get_db() as db:
+            cursor = await db.execute(
+                "SELECT COUNT(*) as cnt FROM operations WHERE status = 'pending'"
+            )
+            row = await cursor.fetchone()
+            pending = row["cnt"] if row else 0
+    except Exception:
+        pass
     return {
         "running": _queue_state["running"],
         "paused": _queue_state["paused"],
         "concurrency": _queue_state["concurrency"],
-        "active_count": len(_queue_state["active_ops"]),
+        "active_count": active,
+        "running_count": active,
+        "pending_count": pending,
     }
 
 

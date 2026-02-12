@@ -23,6 +23,26 @@ async def safe_copy(
     """
     Safely copy a file with verification.
     
+    Runs I/O in a thread executor to avoid blocking the event loop.
+    """
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None,
+        _safe_copy_sync,
+        source_path, dest_path, verify_hash, overwrite, progress_callback
+    )
+
+
+def _safe_copy_sync(
+    source_path: str,
+    dest_path: str,
+    verify_hash: bool,
+    overwrite: bool,
+    progress_callback: Optional[Callable[[int], None]]
+) -> bool:
+    """
+    Synchronous safe copy implementation.
+    
     1. Check destination doesn't exist (unless overwrite=True)
     2. Copy to temp file
     3. Verify size matches
@@ -242,8 +262,6 @@ async def create_copy_operation(
         
         # Build destination path (mirror structure from source)
         source_full = source_file["path"]
-        source_mount = source_file["source_mount"]
-        relative_path = source_full
         
         if dest_path is None:
             dest_path = os.path.join(dest_drive["mount_path"], os.path.basename(source_full))

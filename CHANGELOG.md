@@ -1,5 +1,30 @@
 # Changelog
 
+## [v1.1.2] - 2026-02-10
+
+### Deep Audit Pass
+
+**Critical Fixes**
+- Added write-mode guards to quarantine, restore, and confirm_plan endpoints (`cleanup.py`, `plans.py`)
+- Fixed queue status type mismatch — backend now returns `running_count`/`pending_count` matching frontend (`queue.py`, `ops.py`)
+- Moved `safe_copy` I/O to thread executor to prevent event loop blocking during multi-GB copies (`copier.py`)
+
+**High Fixes**
+- Added path traversal validation to quarantine endpoint (`cleanup.py`)
+- Eliminated scanner dual-state desync with `_set_scan_state()` setter (`scanner.py`)
+- Wrapped hasher queue in try/finally to prevent permanent stuck state on error (`hasher.py`)
+- Added plan status check to `toggle_plan_item` — only draft plans modifiable (`plans.py`)
+
+**Medium Fixes**
+- Added `usedforsecurity=False` to `hashlib.md5()` for FIPS compatibility (`hasher.py`)
+
+**Cleanup**
+- Removed unused `Any` import (`scanner.py`)
+- Removed dead `relative_path` / `source_mount` variables (`copier.py`)
+- Simplified `queue_status_endpoint` — removed duplicated DB queries (`ops.py`)
+
+---
+
 ## [v1.1.1-audit] - 2026-02-08
 
 ### Stability & Audit Pass

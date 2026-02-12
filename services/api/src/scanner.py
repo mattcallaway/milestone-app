@@ -5,7 +5,7 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Callable, Any
+from typing import Optional, Callable
 
 from .database import get_db
 from .models import ScanState, ThrottleLevel
@@ -26,6 +26,13 @@ _scan_status = {
 _scan_task: Optional[asyncio.Task] = None
 _cancel_requested = False
 _pause_requested = False
+
+
+def _set_scan_state(state: ScanState) -> None:
+    """Set scan state in both tracking locations to prevent desync."""
+    global _scan_state
+    _scan_state = state
+    _scan_status["state"] = state
 
 # Log paths
 LOG_DIR = Path(__file__).parent.parent / "data" / "logs"
@@ -84,10 +91,10 @@ async def scan_directory(
                 return stats
             
             while _pause_requested:
-                _scan_state = ScanState.PAUSED
+                _set_scan_state(ScanState.PAUSED)
                 await asyncio.sleep(0.5)
             
-            _scan_state = ScanState.RUNNING
+            _set_scan_state(ScanState.RUNNING)
             
             for filename in filenames:
                 if _cancel_requested:
@@ -163,7 +170,7 @@ async def run_scan(drive_id: Optional[int], throttle: ThrottleLevel) -> None:
     global _scan_state, _scan_status, _cancel_requested, _pause_requested
     global JSONL_LOG, TEXT_LOG
     
-    _scan_state = ScanState.RUNNING
+    _set_scan_state(ScanState.RUNNING)
     _cancel_requested = False
     _pause_requested = False
     _scan_status["started_at"] = datetime.now().isoformat()
@@ -209,9 +216,9 @@ async def run_scan(drive_id: Optional[int], throttle: ThrottleLevel) -> None:
             })
         
         if _cancel_requested:
-            _scan_state = ScanState.CANCELLED
+            _set_scan_state(ScanState.CANCELLED)
         else:
-            _scan_state = ScanState.COMPLETED
+            _set_scan_state(ScanState.COMPLETED)
         
         log_event("scan_complete", {
             "state": _scan_state.value,
@@ -222,8 +229,7 @@ async def run_scan(drive_id: Optional[int], throttle: ThrottleLevel) -> None:
         })
         
     except Exception as e:
-        _scan_state = ScanState.CANCELLED
-        _scan_status["state"] = ScanState.CANCELLED
+        _set_scan_state(ScanState.CANCELLED)
         log_event("scan_error", {"error": str(e)})
         raise
 

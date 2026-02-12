@@ -8,6 +8,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 from ..database import get_db
+from ..config import is_write_enabled
 
 
 router = APIRouter(prefix="/cleanup", tags=["cleanup"])
@@ -142,6 +143,8 @@ async def quarantine_files(request: QuarantineRequest) -> dict:
     Move files to quarantine folder (reversible delete).
     Files are moved to {drive}/.quarantine/{date}/{original_path}
     """
+    if not is_write_enabled():
+        raise HTTPException(status_code=403, detail="Write mode is not enabled")
     if not request.file_ids:
         raise HTTPException(status_code=400, detail="No file IDs provided")
     
@@ -184,6 +187,12 @@ async def quarantine_files(request: QuarantineRequest) -> dict:
             rel_path = os.path.relpath(source_path, drive_mount)
             quarantine_dest = os.path.join(quarantine_base, rel_path)
             
+            # Validate path is within drive boundary (prevent traversal)
+            resolved = os.path.realpath(quarantine_dest)
+            if not resolved.startswith(os.path.realpath(drive_mount)):
+                errors.append({"file_id": file_id, "error": "Quarantine path outside drive boundary"})
+                continue
+            
             try:
                 os.makedirs(os.path.dirname(quarantine_dest), exist_ok=True)
                 shutil.move(source_path, quarantine_dest)
@@ -215,6 +224,8 @@ async def quarantine_files(request: QuarantineRequest) -> dict:
 @router.post("/restore")
 async def restore_from_quarantine(file_ids: list[int]) -> dict:
     """Restore quarantined files to their original locations."""
+    if not is_write_enabled():
+        raise HTTPException(status_code=403, detail="Write mode is not enabled")
     async with get_db() as db:
         restored = []
         errors = []
