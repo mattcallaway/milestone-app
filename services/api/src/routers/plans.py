@@ -96,10 +96,10 @@ async def create_copy_plan(data: PlanCreate) -> dict:
         # Get available destination drives
         cursor = await db.execute(
             """
-            SELECT id, mount_path, free_space 
+            SELECT id, mount_path 
             FROM drives 
             WHERE never_write = 0 AND read_only = 0
-            ORDER BY preferred DESC, free_space DESC
+            ORDER BY preferred DESC
             """
         )
         dest_drives = await cursor.fetchall()
