@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+import shutil
 
 from ..database import get_db
 from ..config import is_write_enabled
@@ -300,6 +301,106 @@ async def confirm_plan(plan_id: int) -> dict:
             "status": "executed"
         }
 
+
+@router.get("/{plan_id}/drive-impact")
+async def get_drive_impact(plan_id: int) -> dict:
+    """Calculate per-drive space impact of executing this plan.
+    
+    Returns current disk stats + projected changes for each affected drive.
+    """
+    async with get_db() as db:
+        cursor = await db.execute("SELECT * FROM plans WHERE id = ?", (plan_id,))
+        plan = await cursor.fetchone()
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        
+        # Get all included plan items with file sizes and drive info
+        cursor = await db.execute("""
+            SELECT 
+                pi.action,
+                pi.source_file_id,
+                pi.dest_drive_id,
+                f.size,
+                f.root_id,
+                r.drive_id as source_drive_id
+            FROM plan_items pi
+            LEFT JOIN files f ON pi.source_file_id = f.id
+            LEFT JOIN roots r ON f.root_id = r.id
+            WHERE pi.plan_id = ? AND pi.included = 1
+        """, (plan_id,))
+        items = await cursor.fetchall()
+        
+        # Accumulate bytes per drive
+        # drive_id -> {"incoming": bytes, "outgoing": bytes}
+        drive_changes: dict[int, dict] = {}
+        
+        for item in items:
+            size = item["size"] or 0
+            
+            if item["action"] == "copy" and item["dest_drive_id"]:
+                dest_id = item["dest_drive_id"]
+                if dest_id not in drive_changes:
+                    drive_changes[dest_id] = {"incoming": 0, "outgoing": 0}
+                drive_changes[dest_id]["incoming"] += size
+            
+            if item["action"] == "delete" and item["source_drive_id"]:
+                src_id = item["source_drive_id"]
+                if src_id not in drive_changes:
+                    drive_changes[src_id] = {"incoming": 0, "outgoing": 0}
+                drive_changes[src_id]["outgoing"] += size
+        
+        # Get all drives info
+        cursor = await db.execute(
+            "SELECT id, mount_path, volume_label, preferred FROM drives"
+        )
+        all_drives = {row["id"]: dict(row) for row in await cursor.fetchall()}
+        
+        # Build impact summary for each affected drive
+        impacts = []
+        for drive_id, changes in drive_changes.items():
+            drive = all_drives.get(drive_id)
+            if not drive:
+                continue
+            
+            # Get live disk space
+            try:
+                usage = shutil.disk_usage(drive["mount_path"])
+                total = usage.total
+                used = usage.used
+                free = usage.free
+            except Exception:
+                total = used = free = 0
+            
+            net_change = changes["incoming"] - changes["outgoing"]
+            projected_free = free - net_change
+            projected_used = used + net_change
+            
+            impacts.append({
+                "drive_id": drive_id,
+                "mount_path": drive["mount_path"],
+                "label": drive["volume_label"] or drive["mount_path"],
+                "preferred": drive["preferred"],
+                "total": total,
+                "used": used,
+                "free": free,
+                "incoming": changes["incoming"],
+                "outgoing": changes["outgoing"],
+                "net_change": net_change,
+                "projected_free": max(0, projected_free),
+                "projected_used": min(total, projected_used) if total else projected_used,
+                "utilization_pct": round(used / total * 100, 1) if total else 0,
+                "projected_utilization_pct": round(min(total, projected_used) / total * 100, 1) if total else 0,
+            })
+        
+        # Sort: drives receiving data first, then by mount path
+        impacts.sort(key=lambda d: (-d["incoming"], d["mount_path"]))
+        
+        return {
+            "plan_id": plan_id,
+            "drives": impacts,
+            "total_incoming": sum(d["incoming"] for d in impacts),
+            "total_outgoing": sum(d["outgoing"] for d in impacts),
+        }
 
 @router.delete("/{plan_id}")
 async def cancel_plan(plan_id: int) -> dict:
