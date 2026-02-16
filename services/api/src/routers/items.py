@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 
 from ..database import get_db
-from ..matcher import merge_items, split_file, process_all_unlinked_files
+from ..matcher import merge_items, split_file, process_all_unlinked_files, dedup_merge_all
 
 router = APIRouter(prefix="/items", tags=["items"])
 
@@ -220,6 +220,17 @@ async def process_unlinked() -> dict:
     result = await process_all_unlinked_files()
     return result
 
+
+@router.post("/dedup")
+async def dedup_items() -> dict:
+    """Merge duplicate media items that share the same title+type+year+season+episode.
+    
+    This is a one-time cleanup operation that consolidates items which
+    should have been linked as copies but were created as separate items
+    before title-based matching was available.
+    """
+    result = await dedup_merge_all()
+    return result
 
 @router.patch("/{item_id}")
 async def update_item(

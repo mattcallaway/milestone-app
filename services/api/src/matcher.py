@@ -291,6 +291,78 @@ async def merge_items(target_id: int, source_ids: list[int]) -> dict:
         return {"target_id": target_id, "files_moved": files_moved, "items_merged": len(source_ids)}
 
 
+async def dedup_merge_all() -> dict:
+    """Merge all media items that share the same title+type+year+season+episode.
+    
+    For each group of duplicates, the lowest-ID item becomes the target
+    and all file links from other items are moved into it. Empty items
+    are deleted.
+    
+    This is a one-time remediation for items created before title-based
+    matching was implemented.
+    """
+    stats = {"groups_merged": 0, "items_removed": 0, "files_relinked": 0}
+    BATCH_SIZE = 500
+    
+    async with get_db() as db:
+        # Find all duplicate title groups
+        cursor = await db.execute("""
+            SELECT type, title, year, season, episode, 
+                   MIN(id) as target_id, COUNT(*) as cnt
+            FROM media_items
+            WHERE title IS NOT NULL
+            GROUP BY type, title, year, season, episode
+            HAVING cnt > 1
+        """)
+        groups = await cursor.fetchall()
+        
+        pending = 0
+        
+        for group in groups:
+            target_id = group["target_id"]
+            
+            # Get all item IDs in this group (except target)
+            cursor = await db.execute("""
+                SELECT id FROM media_items
+                WHERE type = ? AND title = ? AND year IS ? AND season IS ? AND episode IS ?
+                  AND id != ?
+            """, (group["type"], group["title"], group["year"],
+                  group["season"], group["episode"], target_id))
+            source_rows = await cursor.fetchall()
+            
+            for source in source_rows:
+                source_id = source["id"]
+                
+                # Move file links — use INSERT OR IGNORE to handle
+                # cases where the file is already linked to the target
+                cursor = await db.execute("""
+                    INSERT OR IGNORE INTO media_item_files (media_item_id, file_id, is_primary)
+                    SELECT ?, file_id, 0 FROM media_item_files WHERE media_item_id = ?
+                """, (target_id, source_id))
+                stats["files_relinked"] += cursor.rowcount
+                
+                # Remove old links
+                await db.execute(
+                    "DELETE FROM media_item_files WHERE media_item_id = ?",
+                    (source_id,)
+                )
+                
+                # Delete the now-empty item
+                await db.execute("DELETE FROM media_items WHERE id = ?", (source_id,))
+                stats["items_removed"] += 1
+            
+            stats["groups_merged"] += 1
+            pending += 1
+            
+            if pending >= BATCH_SIZE:
+                await db.commit()
+                pending = 0
+        
+        if pending > 0:
+            await db.commit()
+    
+    return stats
+
 async def split_file(file_id: int) -> dict:
     """Split a file out of its current media item into a new one."""
     async with get_db() as db:
