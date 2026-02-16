@@ -116,44 +116,95 @@ async def create_media_item_from_file(file_id: int) -> Optional[int]:
 
 
 async def process_all_unlinked_files() -> dict:
-    """Process all files not yet linked to media items."""
+    """Process all files not yet linked to media items.
+    
+    Optimized: uses a single DB connection and batch commits
+    instead of per-file connection overhead.
+    """
     stats = {"processed": 0, "new_items": 0, "linked": 0, "skipped": 0}
+    BATCH_SIZE = 500
     
     async with get_db() as db:
+        # Fetch all unlinked files with their paths in one query
         cursor = await db.execute("""
-            SELECT f.id FROM files f
+            SELECT f.id, f.path, f.quick_sig, f.full_hash
+            FROM files f
             LEFT JOIN media_item_files mif ON f.id = mif.file_id
             WHERE mif.file_id IS NULL
         """)
         unlinked = await cursor.fetchall()
-    
-    for row in unlinked:
-        file_id = row["id"]
         
-        async with get_db() as db:
-            cursor = await db.execute("SELECT path FROM files WHERE id = ?", (file_id,))
-            file_row = await cursor.fetchone()
-            if not file_row or not is_media_file(file_row["path"]):
+        pending_commits = 0
+        
+        for row in unlinked:
+            file_id = row["id"]
+            filepath = row["path"]
+            
+            # Skip non-media files
+            if not is_media_file(filepath):
                 stats["skipped"] += 1
                 continue
-        
-        result = await create_media_item_from_file(file_id)
-        stats["processed"] += 1
-        
-        if result:
-            # Check if this was a new item or existing
-            async with get_db() as db:
+            
+            # Try to find matching item by hash
+            matching_id = None
+            if row["full_hash"]:
                 cursor = await db.execute(
-                    "SELECT COUNT(*) FROM media_item_files WHERE media_item_id = ?",
-                    (result,)
+                    """SELECT mif.media_item_id FROM media_item_files mif
+                       JOIN files f ON mif.file_id = f.id
+                       WHERE f.full_hash = ? LIMIT 1""",
+                    (row["full_hash"],)
                 )
-                count = (await cursor.fetchone())[0]
-                if count == 1:
-                    stats["new_items"] += 1
-                else:
-                    stats["linked"] += 1
+                match = await cursor.fetchone()
+                if match:
+                    matching_id = match[0]
+            
+            if not matching_id and row["quick_sig"]:
+                cursor = await db.execute(
+                    """SELECT mif.media_item_id FROM media_item_files mif
+                       JOIN files f ON mif.file_id = f.id
+                       WHERE f.quick_sig = ? LIMIT 1""",
+                    (row["quick_sig"],)
+                )
+                match = await cursor.fetchone()
+                if match:
+                    matching_id = match[0]
+            
+            if matching_id:
+                # Link to existing item
+                await db.execute(
+                    "INSERT OR IGNORE INTO media_item_files (media_item_id, file_id) VALUES (?, ?)",
+                    (matching_id, file_id)
+                )
+                stats["linked"] += 1
+            else:
+                # Create new item with parsed metadata
+                parsed = parse_path(filepath)
+                cursor = await db.execute(
+                    """INSERT INTO media_items (type, title, year, season, episode, status)
+                       VALUES (?, ?, ?, ?, ?, 'auto')""",
+                    (parsed.type, parsed.title, parsed.year, parsed.season, parsed.episode)
+                )
+                item_id = cursor.lastrowid
+                await db.execute(
+                    "INSERT INTO media_item_files (media_item_id, file_id, is_primary) VALUES (?, ?, 1)",
+                    (item_id, file_id)
+                )
+                stats["new_items"] += 1
+            
+            stats["processed"] += 1
+            pending_commits += 1
+            
+            # Batch commit every BATCH_SIZE files
+            if pending_commits >= BATCH_SIZE:
+                await db.commit()
+                pending_commits = 0
+        
+        # Final commit for remaining items
+        if pending_commits > 0:
+            await db.commit()
     
     return stats
+
 
 
 async def merge_items(target_id: int, source_ids: list[int]) -> dict:

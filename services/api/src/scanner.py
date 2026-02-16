@@ -76,7 +76,12 @@ async def scan_directory(
     throttle: ThrottleLevel,
     progress_callback: Optional[Callable[[dict], Any]] = None
 ) -> dict:
-    """Scan a directory and update database."""
+    """Scan a directory and update database.
+    
+    Optimized with in-memory path cache: pre-loads all known
+    file paths + mtimes so re-scans skip per-file DB lookups
+    for unchanged files. Throttle delay only applied to new/updated files.
+    """
     global _scan_state, _scan_status, _cancel_requested, _pause_requested
     
     delay = get_throttle_delay(throttle)
@@ -84,6 +89,20 @@ async def scan_directory(
     scan_time = datetime.now().isoformat()
     
     async with get_db() as db:
+        # Pre-load all known files for this root into memory
+        # This avoids a per-file SELECT query on re-scans
+        cursor = await db.execute(
+            "SELECT id, path, mtime FROM files WHERE root_id = ?",
+            (root_id,)
+        )
+        rows = await cursor.fetchall()
+        # path -> (id, mtime)
+        known_files = {r["path"]: (r["id"], r["mtime"]) for r in rows}
+        seen_paths = set()
+        
+        batch_count = 0
+        BATCH_COMMIT = 1000
+        
         for dirpath, dirnames, filenames in os.walk(root_path):
             # Check for cancel/pause
             if _cancel_requested:
@@ -101,35 +120,39 @@ async def scan_directory(
                     return stats
                 
                 filepath = os.path.join(dirpath, filename)
+                seen_paths.add(filepath)
+                
                 try:
                     stat = os.stat(filepath)
                     size = stat.st_size
                     mtime = stat.st_mtime
                     ext = os.path.splitext(filename)[1].lower().lstrip(".")
                     
-                    # Check if file exists in DB
-                    cursor = await db.execute(
-                        "SELECT id, mtime FROM files WHERE root_id = ? AND path = ?",
-                        (root_id, filepath)
-                    )
-                    existing = await cursor.fetchone()
+                    cached = known_files.get(filepath)
                     
-                    if existing:
-                        if existing["mtime"] != mtime:
-                            # File was modified
+                    if cached:
+                        file_id, cached_mtime = cached
+                        if cached_mtime != mtime:
+                            # File was modified — update DB
                             await db.execute(
                                 """UPDATE files SET size = ?, mtime = ?, ext = ?, last_seen = ?
                                    WHERE id = ?""",
-                                (size, mtime, ext, scan_time, existing["id"])
+                                (size, mtime, ext, scan_time, file_id)
                             )
                             stats["updated"] += 1
+                            batch_count += 1
+                            # Only throttle on actual disk-heavy changes
+                            if delay > 0:
+                                await asyncio.sleep(delay)
                         else:
-                            # Just update last_seen
+                            # Unchanged — just mark seen (no DB lookup needed)
                             await db.execute(
                                 "UPDATE files SET last_seen = ? WHERE id = ?",
-                                (scan_time, existing["id"])
+                                (scan_time, file_id)
                             )
                             stats["unchanged"] += 1
+                            batch_count += 1
+                            # No throttle for unchanged files
                     else:
                         # New file
                         await db.execute(
@@ -138,28 +161,38 @@ async def scan_directory(
                             (root_id, filepath, size, mtime, ext, scan_time)
                         )
                         stats["new"] += 1
+                        batch_count += 1
+                        # Throttle on new file discovery
+                        if delay > 0:
+                            await asyncio.sleep(delay)
                     
                     _scan_status["files_scanned"] += 1
                     _scan_status["files_new"] = stats["new"]
                     _scan_status["files_updated"] = stats["updated"]
                     
-                    if delay > 0:
-                        await asyncio.sleep(delay)
-                        
                 except (OSError, PermissionError) as e:
                     log_event("file_error", {"path": filepath, "error": str(e)})
                     continue
             
-            # Commit periodically
+            # Commit periodically (per-directory or every BATCH_COMMIT files)
+            if batch_count >= BATCH_COMMIT:
+                await db.commit()
+                batch_count = 0
+        
+        # Final commit for remaining changes
+        if batch_count > 0:
             await db.commit()
         
-        # Mark missing files (files that weren't seen in this scan)
-        cursor = await db.execute(
-            """UPDATE files SET last_seen = NULL 
-               WHERE root_id = ? AND (last_seen IS NULL OR last_seen < ?)""",
-            (root_id, scan_time)
-        )
-        _scan_status["files_missing"] = cursor.rowcount
+        # Mark missing files (files in DB but not seen on disk)
+        missing_count = 0
+        for path, (file_id, _) in known_files.items():
+            if path not in seen_paths:
+                await db.execute(
+                    "UPDATE files SET last_seen = NULL WHERE id = ?",
+                    (file_id,)
+                )
+                missing_count += 1
+        _scan_status["files_missing"] = missing_count
         await db.commit()
     
     return stats
