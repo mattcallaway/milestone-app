@@ -4,7 +4,7 @@ from typing import Optional
 from datetime import datetime
 
 from .database import get_db
-from .parser import parse_path, is_video_file
+from .parser import parse_path, is_media_file
 
 
 async def find_matching_item(quick_sig: Optional[str], full_hash: Optional[str]) -> Optional[int]:
@@ -68,7 +68,7 @@ async def create_media_item_from_file(file_id: int) -> Optional[int]:
         filepath = file_row["path"]
         
         # Only process video files
-        if not is_video_file(filepath):
+        if not is_media_file(filepath):
             return None
         
         # Check if file is already linked to an item
@@ -133,7 +133,7 @@ async def process_all_unlinked_files() -> dict:
         async with get_db() as db:
             cursor = await db.execute("SELECT path FROM files WHERE id = ?", (file_id,))
             file_row = await cursor.fetchone()
-            if not file_row or not is_video_file(file_row["path"]):
+            if not file_row or not is_media_file(file_row["path"]):
                 stats["skipped"] += 1
                 continue
         

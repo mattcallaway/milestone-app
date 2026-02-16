@@ -1,4 +1,4 @@
-"""Media filename parser for TV shows and movies."""
+"""Media filename parser for TV shows, movies, and audiobooks."""
 
 import re
 from dataclasses import dataclass
@@ -8,7 +8,7 @@ from typing import Optional
 @dataclass
 class ParsedMedia:
     """Parsed media information from filename."""
-    type: str  # 'movie', 'tv_episode', 'unknown'
+    type: str  # 'movie', 'tv_episode', 'audiobook', 'unknown'
     title: Optional[str] = None
     year: Optional[int] = None
     season: Optional[int] = None
@@ -40,6 +40,18 @@ VIDEO_EXTENSIONS = {
     'mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 
     'm4v', 'mpg', 'mpeg', 'ts', 'm2ts', 'vob'
 }
+
+# Common audio extensions
+AUDIO_EXTENSIONS = {
+    'mp3', 'm4a', 'm4b', 'flac', 'ogg', 'opus', 'wma',
+    'aac', 'wav', 'alac', 'aiff', 'ape'
+}
+
+# All recognized media extensions
+MEDIA_EXTENSIONS = VIDEO_EXTENSIONS | AUDIO_EXTENSIONS
+
+# Folder names that indicate audiobook content
+AUDIOBOOK_FOLDER_HINTS = {'audiobooks', 'audiobook'}
 
 
 def clean_title(title: str) -> str:
@@ -102,13 +114,41 @@ def parse_filename(filename: str) -> ParsedMedia:
 def parse_path(filepath: str) -> ParsedMedia:
     """
     Parse a full file path, using both filename and directory hints.
+    
+    Detection priority:
+    1. Filename patterns (TV episodes via S01E02, movies via year)
+    2. Parent directory hints (Season folders, Audiobooks folder)
+    3. File extension hints (.m4b is almost always an audiobook)
     """
     from pathlib import Path
     
     path = Path(filepath)
     filename = path.name
+    ext = path.suffix.lstrip('.').lower()
     
-    # First try parsing the filename
+    # Collect parent directory names for hint matching
+    parent_names_lower = [p.name.lower() for p in path.parents if p.name]
+    
+    # Check if any parent directory indicates audiobook content
+    is_in_audiobook_dir = any(
+        name in AUDIOBOOK_FOLDER_HINTS for name in parent_names_lower
+    )
+    
+    # If file is audio AND in an audiobook directory, classify as audiobook
+    if ext in AUDIO_EXTENSIONS and is_in_audiobook_dir:
+        return ParsedMedia(
+            type='audiobook',
+            title=clean_title(re.sub(r'\.[^.]+$', '', filename))
+        )
+    
+    # .m4b files are audiobooks by convention, even without folder hints
+    if ext == 'm4b':
+        return ParsedMedia(
+            type='audiobook',
+            title=clean_title(re.sub(r'\.[^.]+$', '', filename))
+        )
+    
+    # First try parsing the filename (TV / movie patterns)
     result = parse_filename(filename)
     
     # If unknown, try to get hints from parent directories
@@ -130,3 +170,15 @@ def is_video_file(filepath: str) -> bool:
     """Check if file is a video based on extension."""
     ext = filepath.rsplit('.', 1)[-1].lower() if '.' in filepath else ''
     return ext in VIDEO_EXTENSIONS
+
+
+def is_audio_file(filepath: str) -> bool:
+    """Check if file is an audio file based on extension."""
+    ext = filepath.rsplit('.', 1)[-1].lower() if '.' in filepath else ''
+    return ext in AUDIO_EXTENSIONS
+
+
+def is_media_file(filepath: str) -> bool:
+    """Check if file is any recognized media type (video or audio)."""
+    ext = filepath.rsplit('.', 1)[-1].lower() if '.' in filepath else ''
+    return ext in MEDIA_EXTENSIONS

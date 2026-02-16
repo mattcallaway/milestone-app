@@ -8,9 +8,18 @@ from pathlib import Path
 
 from .database import get_db
 from .hasher import compute_full_hash
+from .config import get_settings
 
 
 CHUNK_SIZE = 1024 * 1024  # 1MB chunks for progress reporting
+
+# Default type → folder mapping
+# Configurable via settings.type_folder_map
+DEFAULT_TYPE_FOLDER_MAP = {
+    'movie': 'Movies',
+    'tv_episode': 'TV',
+    'audiobook': 'Audiobooks',
+}
 
 
 async def safe_copy(
@@ -260,11 +269,32 @@ async def create_copy_operation(
             if not dest_drive:
                 raise ValueError(f"Destination drive not found: {dest_drive_id}")
         
-        # Build destination path (mirror structure from source)
+        # Build destination path using type-aware folder routing
         source_full = source_file["path"]
         
         if dest_path is None:
-            dest_path = os.path.join(dest_drive["mount_path"], os.path.basename(source_full))
+            media_type = source_file.get("media_type") or "unknown"
+            
+            # Get folder mapping from config, falling back to defaults
+            settings = get_settings()
+            folder_map = getattr(settings, 'type_folder_map', None) or DEFAULT_TYPE_FOLDER_MAP
+            type_folder = folder_map.get(media_type, '')
+            
+            # Build relative path preserving original subfolder structure
+            # e.g., source: D:\TV\Breaking Bad\Season 01\ep.mkv
+            #   → root_path: D:\TV
+            #   → relative: Breaking Bad\Season 01\ep.mkv
+            #   → dest: E:\TV\Breaking Bad\Season 01\ep.mkv
+            root_path = source_file.get("root_path", "")
+            if root_path and source_full.startswith(root_path):
+                relative = source_full[len(root_path):].lstrip(os.sep)
+            else:
+                relative = os.path.basename(source_full)
+            
+            if type_folder:
+                dest_path = os.path.join(dest_drive["mount_path"], type_folder, relative)
+            else:
+                dest_path = os.path.join(dest_drive["mount_path"], relative)
         
         # Check destination doesn't already exist
         if os.path.exists(dest_path):

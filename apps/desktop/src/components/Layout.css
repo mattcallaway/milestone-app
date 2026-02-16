@@ -76,3 +76,72 @@
     overflow-y: auto;
     background: #0f0f0f;
 }
+
+/* Version tag */
+.version-tag {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: rgba(102, 126, 234, 0.2);
+    color: #667eea;
+    border-radius: 4px;
+    vertical-align: middle;
+}
+
+/* Expert Mode Banner */
+.expert-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    margin: 0 12px 8px;
+    background: rgba(244, 67, 54, 0.15);
+    border: 1px solid rgba(244, 67, 54, 0.4);
+    border-radius: 8px;
+    color: #f44336;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    animation: expertPulse 2s ease-in-out infinite;
+}
+
+@keyframes expertPulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Nav separator */
+.nav-separator {
+    padding: 12px 16px 4px;
+    margin-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.nav-separator span {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #555;
+}
+
+/* Expert nav items */
+.nav-item.expert {
+    color: #ff9800;
+}
+
+.nav-item.expert.active {
+    background: linear-gradient(135deg, rgba(255, 152, 0, 0.15) 0%, rgba(244, 67, 54, 0.15) 100%);
+    border-color: rgba(255, 152, 0, 0.3);
+    color: #ffb74d;
+}

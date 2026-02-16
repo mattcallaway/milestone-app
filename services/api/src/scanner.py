@@ -5,7 +5,7 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Any, Optional, Callable
 
 from .database import get_db
 from .models import ScanState, ThrottleLevel

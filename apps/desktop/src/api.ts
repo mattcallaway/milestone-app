@@ -415,3 +415,258 @@ export const exportApi = {
     getDuplicatesUrl: () => `${API_BASE}/exports/duplicates`,
 };
 
+// ==========================================
+// v2.0.0 — Expert Mode & Advanced Features
+// ==========================================
+
+// Types
+export interface ExpertStatus {
+    active: boolean;
+    activated_at: string | null;
+    persistent: boolean;
+    confirmation_required: string;
+}
+
+export interface RiskScoreItem {
+    item_id: number;
+    type: string;
+    title: string;
+    copy_count: number;
+    drive_count: number;
+    domain_count: number;
+    verified_copies: number;
+    risk_score: number;
+    risk_level: 'critical' | 'high' | 'medium' | 'low';
+}
+
+export interface AuditEntry {
+    id: number;
+    action: string;
+    entity_type: string | null;
+    entity_id: number | null;
+    details: string | null;
+    expert_mode: number;
+    override_used: string | null;
+    created_at: string;
+}
+
+export interface OrphanResult {
+    missing_on_disk: Array<{ file_id: number; path: string; drive: string; size: number }>;
+    unindexed_on_disk: Array<{ path: string; size: number; root_id: number }>;
+    summary: { db_files_checked: number; missing_count: number; unindexed_count: number };
+}
+
+export interface HeatmapDrive {
+    drive_id: number;
+    mount_path: string;
+    volume_label: string | null;
+    file_count: number;
+    item_count: number;
+    used_bytes: number;
+    utilization_pct: number;
+    domain_name: string | null;
+    free_space: number | null;
+    total_space: number | null;
+}
+
+export interface EvacuationPlan {
+    drive: Record<string, unknown>;
+    summary: {
+        total_items_on_drive: number;
+        unique_to_drive: number;
+        needs_additional_copy: number;
+        already_safe: number;
+        total_size: number;
+    };
+    risk: {
+        critical: Array<Record<string, unknown>>;
+        warning: Array<Record<string, unknown>>;
+    };
+    available_destinations: Array<Record<string, unknown>>;
+}
+
+// Expert Mode API
+export const expertApi = {
+    async activate(phrase: string, persist = false): Promise<ExpertStatus> {
+        return request('POST', '/expert/activate', { phrase, persist });
+    },
+
+    async deactivate(): Promise<{ message: string }> {
+        return request('POST', '/expert/deactivate');
+    },
+
+    async status(): Promise<ExpertStatus> {
+        return request('GET', '/expert/status');
+    },
+};
+
+// Analytics API
+export const analyticsApi = {
+    async heatmap(): Promise<{
+        drives: HeatmapDrive[];
+        domains: Array<Record<string, unknown>>;
+        hot_spots: { single_drive_items: number };
+    }> {
+        return request('GET', '/analytics/heatmap');
+    },
+
+    async riskScores(sort = 'score', limit = 50, minRisk = 0): Promise<{
+        items: RiskScoreItem[];
+        total_scored: number;
+        risk_distribution: Record<string, number>;
+    }> {
+        return request('GET', `/analytics/risk-scores?sort=${sort}&limit=${limit}&min_risk=${minRisk}`);
+    },
+
+    async atRisk(limit = 50): Promise<{
+        items: RiskScoreItem[];
+        total_scored: number;
+        risk_distribution: Record<string, number>;
+    }> {
+        return request('GET', `/analytics/at-risk?limit=${limit}`);
+    },
+};
+
+// Recovery API
+export const recoveryApi = {
+    async orphans(): Promise<OrphanResult> {
+        return request('GET', '/recovery/orphans');
+    },
+
+    async repair(action: 'reindex' | 'remove_stale', fileIds: number[] = [], paths: string[] = []): Promise<{
+        message: string; action: string; processed: number;
+    }> {
+        return request('POST', '/recovery/repair', { action, file_ids: fileIds, paths });
+    },
+
+    async auditLog(page = 1, pageSize = 50, action?: string): Promise<{
+        entries: AuditEntry[];
+        total: number;
+        page: number;
+        page_size: number;
+    }> {
+        let url = `/recovery/audit-log?page=${page}&page_size=${pageSize}`;
+        if (action) url += `&action=${action}`;
+        return request('GET', url);
+    },
+};
+
+// Evacuation API
+export const evacuationApi = {
+    async plan(driveId: number): Promise<EvacuationPlan> {
+        return request('POST', '/evacuation/plan', { drive_id: driveId });
+    },
+
+    async execute(driveId: number): Promise<{
+        message: string; drive_id: number; operations_queued: number;
+    }> {
+        return request('POST', '/evacuation/execute', { drive_id: driveId });
+    },
+
+    async status(): Promise<{
+        active: boolean; drive_id: number | null; progress: Record<string, number> | null;
+    }> {
+        return request('GET', '/evacuation/status');
+    },
+};
+
+// Advanced simulation endpoints
+export const simulationExpertApi = {
+    async domainFailure(domainId: number): Promise<Record<string, unknown>> {
+        return request('POST', '/simulation/domain-failure', { domain_id: domainId });
+    },
+
+    async addDrive(totalSpace: number, domainId?: number): Promise<Record<string, unknown>> {
+        return request('POST', '/simulation/add-drive', { total_space: totalSpace, domain_id: domainId });
+    },
+
+    async multiFailure(driveIds: number[], domainIds: number[]): Promise<Record<string, unknown>> {
+        return request('POST', '/simulation/multi-failure', { drive_ids: driveIds, domain_ids: domainIds });
+    },
+};
+
+// Advanced Copy API
+export const advancedCopyApi = {
+    async filesystemInfo(driveId: number): Promise<{
+        drive_id: number; mount_path: string; filesystem_type: string;
+        supports_hardlink: boolean; supports_reflink: boolean;
+    }> {
+        return request('GET', `/advanced-copy/filesystem-info/${driveId}`);
+    },
+
+    async createHardlink(sourceFileId: number, destPath: string): Promise<Record<string, unknown>> {
+        return request('POST', '/advanced-copy/hardlink', { source_file_id: sourceFileId, dest_path: destPath });
+    },
+
+    async convertToFull(fileId: number): Promise<Record<string, unknown>> {
+        return request('POST', '/advanced-copy/convert-to-full', { file_id: fileId });
+    },
+};
+
+// Placement API
+export const placementApi = {
+    async pin(mediaItemId: number, driveId: number): Promise<Record<string, unknown>> {
+        return request('POST', '/placement/pin', { media_item_id: mediaItemId, drive_id: driveId });
+    },
+
+    async unpin(mediaItemId: number, driveId: number): Promise<Record<string, unknown>> {
+        return request('POST', '/placement/unpin', { media_item_id: mediaItemId, drive_id: driveId });
+    },
+
+    async pins(): Promise<{ pins: Array<Record<string, unknown>>; total: number }> {
+        return request('GET', '/placement/pins');
+    },
+
+    async setTargetCopies(target: number): Promise<Record<string, unknown>> {
+        return request('PUT', '/placement/target-copies', { target_copies: target });
+    },
+
+    async impact(): Promise<Record<string, unknown>> {
+        return request('GET', '/placement/impact');
+    },
+};
+
+// Reduction API
+export const reductionApi = {
+    async preview(targetCopies = 2, mediaType?: string): Promise<Record<string, unknown>> {
+        return request('POST', '/reduction/preview', { target_copies: targetCopies, media_type: mediaType });
+    },
+
+    async execute(targetCopies: number, itemIds: number[], permanentDelete = false): Promise<Record<string, unknown>> {
+        return request('POST', '/reduction/execute', {
+            target_copies: targetCopies, item_ids: itemIds, permanent_delete: permanentDelete,
+        });
+    },
+};
+
+// Normalize API
+export const normalizeApi = {
+    async suggestions(): Promise<{ suggestions: Array<Record<string, unknown>>; total: number }> {
+        return request('GET', '/normalize/suggestions');
+    },
+
+    async preview(itemIds: number[] = []): Promise<Record<string, unknown>> {
+        return request('POST', '/normalize/preview', { item_ids: itemIds });
+    },
+
+    async execute(itemIds: number[]): Promise<Record<string, unknown>> {
+        return request('POST', '/normalize/execute', { item_ids: itemIds });
+    },
+};
+
+// Overrides API
+export const overridesApi = {
+    async create(overrideType: string, reason: string, operationId?: number): Promise<Record<string, unknown>> {
+        return request('POST', '/overrides/create', {
+            override_type: overrideType, reason, operation_id: operationId,
+        });
+    },
+
+    async active(): Promise<{ overrides: Array<Record<string, unknown>>; total: number }> {
+        return request('GET', '/overrides/active');
+    },
+
+    async reset(overrideId: number): Promise<{ message: string; override_id: number }> {
+        return request('POST', `/overrides/reset/${overrideId}`);
+    },
+};

@@ -12,6 +12,20 @@ class Settings(BaseSettings):
     # Safe-by-default: read-only mode unless explicitly enabled
     write_mode: bool = False
 
+    # Expert mode: unlocks advanced/dangerous features (requires runtime activation)
+    expert_mode: bool = False
+
+    # Performance mode: higher throughput with safety constraints preserved
+    performance_mode: bool = False
+
+    # Media type → destination folder mapping
+    # Keys: movie, tv_episode, audiobook  |  Values: folder name on dest drive
+    type_folder_map: dict = {
+        "movie": "Movies",
+        "tv_episode": "TV",
+        "audiobook": "Audiobooks",
+    }
+
     # API settings
     api_host: str = "127.0.0.1"
     api_port: int = 8000

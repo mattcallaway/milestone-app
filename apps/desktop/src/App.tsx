@@ -12,8 +12,12 @@ import { CleanupScreen } from './screens/CleanupScreen';
 import { DomainsScreen } from './screens/DomainsScreen';
 import { SimulationScreen } from './screens/SimulationScreen';
 import { PlanScreen } from './screens/PlanScreen';
+import SettingsScreen from './screens/SettingsScreen';
+import AnalyticsScreen from './screens/AnalyticsScreen';
+import RecoveryScreen from './screens/RecoveryScreen';
+import EvacuationScreen from './screens/EvacuationScreen';
 
-type Screen = 'dashboard' | 'drives' | 'roots' | 'scan' | 'library' | 'items' | 'item-detail' | 'operations' | 'cleanup' | 'domains' | 'simulation' | 'plans';
+type Screen = 'dashboard' | 'drives' | 'roots' | 'scan' | 'library' | 'items' | 'item-detail' | 'operations' | 'cleanup' | 'domains' | 'simulation' | 'plans' | 'settings' | 'analytics' | 'recovery' | 'evacuation';
 
 interface ScreenParams {
     itemId?: number;
@@ -73,6 +77,14 @@ function App() {
                 return <SimulationScreen />;
             case 'plans':
                 return <PlanScreen />;
+            case 'settings':
+                return <SettingsScreen />;
+            case 'analytics':
+                return <AnalyticsScreen />;
+            case 'recovery':
+                return <RecoveryScreen />;
+            case 'evacuation':
+                return <EvacuationScreen />;
             default:
                 return <DashboardScreen onNavigate={handleNavigate} />;
         }
