@@ -118,13 +118,38 @@ async def create_media_item_from_file(file_id: int) -> Optional[int]:
 async def process_all_unlinked_files() -> dict:
     """Process all files not yet linked to media items.
     
-    Optimized: uses a single DB connection and batch commits
-    instead of per-file connection overhead.
+    Matching priority:
+    1. Full hash match (exact duplicate)
+    2. Quick signature match (likely duplicate, marked for verification)
+    3. Title-based match (same title+type+year for movies, +season+episode for TV)
+    4. No match → create new media item
+    
+    Optimized: single DB connection, batch commits, in-memory title index.
     """
-    stats = {"processed": 0, "new_items": 0, "linked": 0, "skipped": 0}
+    stats = {"processed": 0, "new_items": 0, "linked": 0, "linked_by_title": 0, "skipped": 0}
     BATCH_SIZE = 500
     
     async with get_db() as db:
+        # Build in-memory title index for fast title-based matching
+        # Key: (type, title_lower, year, season, episode) -> media_item_id
+        cursor = await db.execute("""
+            SELECT id, type, title, year, season, episode FROM media_items
+            WHERE title IS NOT NULL
+        """)
+        existing_items = await cursor.fetchall()
+        title_index = {}
+        for item in existing_items:
+            key = (
+                item["type"],
+                (item["title"] or "").lower(),
+                item["year"],
+                item["season"],
+                item["episode"]
+            )
+            # Keep the first (lowest id) item for each title group
+            if key not in title_index:
+                title_index[key] = item["id"]
+        
         # Fetch all unlinked files with their paths in one query
         cursor = await db.execute("""
             SELECT f.id, f.path, f.quick_sig, f.full_hash
@@ -145,7 +170,7 @@ async def process_all_unlinked_files() -> dict:
                 stats["skipped"] += 1
                 continue
             
-            # Try to find matching item by hash
+            # --- Priority 1 & 2: Hash-based matching ---
             matching_id = None
             if row["full_hash"]:
                 cursor = await db.execute(
@@ -169,16 +194,30 @@ async def process_all_unlinked_files() -> dict:
                 if match:
                     matching_id = match[0]
             
+            # --- Priority 3: Title-based matching ---
+            parsed = parse_path(filepath)
+            
+            if not matching_id and parsed.title:
+                title_key = (
+                    parsed.type,
+                    parsed.title.lower(),
+                    parsed.year,
+                    parsed.season,
+                    parsed.episode
+                )
+                matching_id = title_index.get(title_key)
+                if matching_id:
+                    stats["linked_by_title"] += 1
+            
             if matching_id:
-                # Link to existing item
+                # Link to existing item (copy found!)
                 await db.execute(
                     "INSERT OR IGNORE INTO media_item_files (media_item_id, file_id) VALUES (?, ?)",
                     (matching_id, file_id)
                 )
                 stats["linked"] += 1
             else:
-                # Create new item with parsed metadata
-                parsed = parse_path(filepath)
+                # No match anywhere — create new media item
                 cursor = await db.execute(
                     """INSERT INTO media_items (type, title, year, season, episode, status)
                        VALUES (?, ?, ?, ?, ?, 'auto')""",
@@ -190,6 +229,18 @@ async def process_all_unlinked_files() -> dict:
                     (item_id, file_id)
                 )
                 stats["new_items"] += 1
+                
+                # Add new item to title index so subsequent files match it
+                if parsed.title:
+                    new_key = (
+                        parsed.type,
+                        parsed.title.lower(),
+                        parsed.year,
+                        parsed.season,
+                        parsed.episode
+                    )
+                    if new_key not in title_index:
+                        title_index[new_key] = item_id
             
             stats["processed"] += 1
             pending_commits += 1
