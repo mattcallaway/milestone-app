@@ -35,10 +35,19 @@ export function PlanScreen() {
     const [selectedPlan, setSelectedPlan] = useState<Plan & { items: PlanItem[] } | null>(null);
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
+    const [creatingMessage, setCreatingMessage] = useState('');
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
     useEffect(() => {
         loadPlans();
     }, []);
+
+    // Elapsed time counter while creating
+    useEffect(() => {
+        if (!creating) { setElapsedSeconds(0); return; }
+        const interval = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
+        return () => clearInterval(interval);
+    }, [creating]);
 
     const loadPlans = async () => {
         try {
@@ -63,6 +72,7 @@ export function PlanScreen() {
 
     const createCopyPlan = async () => {
         setCreating(true);
+        setCreatingMessage('Analyzing at-risk items across all drives...');
         try {
             const res = await fetch(`${API_BASE}/plans/copy-at-risk`, {
                 method: 'POST',
@@ -78,13 +88,16 @@ export function PlanScreen() {
             }
         } catch (err) {
             console.error('Failed to create plan:', err);
+            alert('Failed to create plan. Check that the API server is running.');
         } finally {
             setCreating(false);
+            setCreatingMessage('');
         }
     };
 
     const createReductionPlan = async () => {
         setCreating(true);
+        setCreatingMessage('Analyzing over-replicated items...');
         try {
             const res = await fetch(`${API_BASE}/plans/reduce?min_copies=2`, {
                 method: 'POST',
@@ -100,8 +113,10 @@ export function PlanScreen() {
             }
         } catch (err) {
             console.error('Failed to create plan:', err);
+            alert('Failed to create plan. Check that the API server is running.');
         } finally {
             setCreating(false);
+            setCreatingMessage('');
         }
     };
 
@@ -159,16 +174,43 @@ export function PlanScreen() {
                     onClick={createCopyPlan}
                     disabled={creating}
                 >
-                    📦 Plan 2nd Copies for At-Risk
+                    {creating ? '⏳ Creating...' : '📦 Plan 2nd Copies for At-Risk'}
                 </button>
                 <button
                     className="btn btn-secondary"
                     onClick={createReductionPlan}
                     disabled={creating}
                 >
-                    🗜️ Plan Reduction to 2 Copies
+                    {creating ? '⏳ Creating...' : '🗜️ Plan Reduction to 2 Copies'}
                 </button>
             </div>
+
+            {creating && (
+                <div className="creating-status" style={{
+                    padding: '16px',
+                    margin: '12px 0',
+                    background: 'var(--surface-2, #1e293b)',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px'
+                }}>
+                    <div className="spinner" style={{
+                        width: '20px', height: '20px',
+                        border: '3px solid rgba(255,255,255,0.1)',
+                        borderTop: '3px solid #60a5fa',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                    }} />
+                    <div>
+                        <div style={{ fontWeight: 600 }}>{creatingMessage}</div>
+                        <div style={{ fontSize: '0.85em', opacity: 0.7 }}>
+                            {elapsedSeconds > 0 && `${elapsedSeconds}s elapsed — `}
+                            This may take a moment for large libraries.
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {plans.length > 0 && (
                 <div className="plans-list">
