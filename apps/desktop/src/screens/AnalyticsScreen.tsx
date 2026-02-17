@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { analyticsApi, HeatmapDrive, RiskScoreItem } from '../api';
 import './Screens.css';
 

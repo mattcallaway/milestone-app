@@ -24,14 +24,6 @@ interface SimulationResult {
     domain_violations: { item_id: number; type: string; title: string; current_domains: number; remaining_domains: number }[];
 }
 
-function formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}
-
 export function SimulationScreen() {
     const [drives, setDrives] = useState<Drive[]>([]);
     const [selectedDrives, setSelectedDrives] = useState<Set<number>>(new Set());

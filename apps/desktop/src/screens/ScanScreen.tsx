@@ -65,17 +65,10 @@ export function ScanScreen() {
             case 'completed':
                 return '#2196f3';
             case 'cancelled':
-                return '#f44336';
+                return '#f4436';
             default:
                 return '#666';
         }
-    };
-
-    const formatDuration = (seconds: number | null): string => {
-        if (seconds === null) return '--';
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
     const isActive = status?.state === 'running' || status?.state === 'paused';

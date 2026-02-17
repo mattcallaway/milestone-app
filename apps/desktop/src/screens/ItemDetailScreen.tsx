@@ -11,7 +11,7 @@ export function ItemDetailScreen({ itemId, onBack }: ItemDetailScreenProps) {
     const [item, setItem] = useState<MediaItemDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
+
     const [mergeTarget, setMergeTarget] = useState<string>('');
 
     const loadItem = async () => {

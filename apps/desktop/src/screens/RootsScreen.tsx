@@ -68,11 +68,6 @@ export function RootsScreen() {
         }
     };
 
-    const getDriveName = (driveId: number): string => {
-        const drive = drives.find((d) => d.id === driveId);
-        return drive?.mount_path || 'Unknown';
-    };
-
     const rootsByDrive = drives.map((drive) => ({
         drive,
         roots: roots.filter((r) => r.drive_id === drive.id),
