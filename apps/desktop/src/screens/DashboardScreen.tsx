@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api, ItemStats } from '../api';
+import { api, ItemStats, HashStatus } from '../api';
 import './Screens.css';
 
 interface DashboardScreenProps {
@@ -11,6 +11,7 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [processing, setProcessing] = useState(false);
+    const [hashStatus, setHashStatus] = useState<HashStatus | null>(null);
 
     const loadStats = async () => {
         try {
@@ -29,6 +30,30 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
         loadStats();
     }, []);
 
+    // Poll hash status
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+
+        const checkStatus = async () => {
+            try {
+                const status = await api.getHashStatus();
+                setHashStatus(status);
+
+                // If running, keep polling
+                if (status.state === 'running') {
+                    interval = setTimeout(checkStatus, 1000);
+                }
+            } catch (err) {
+                console.error('Failed to get hash status:', err);
+            }
+        };
+
+        // Start polling initially and when trigger changes
+        checkStatus();
+
+        return () => clearTimeout(interval);
+    }, []); // Empty dependency array - self-scheduling
+
     const handleProcessItems = async () => {
         try {
             setProcessing(true);
@@ -45,9 +70,21 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
     const handleStartHashing = async () => {
         try {
             await api.startHashing();
-            alert('Hash computation started');
+            // Trigger status update immediately
+            const status = await api.getHashStatus();
+            setHashStatus(status);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to start hashing');
+        }
+    };
+
+    const handleStopHashing = async () => {
+        try {
+            await api.stopHashing();
+            const status = await api.getHashStatus();
+            setHashStatus(status);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to stop hashing');
         }
     };
 
@@ -89,6 +126,49 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
 
             {error && <div className="error-banner">{error}</div>}
 
+            {/* Hashing Progress Section */}
+            {hashStatus && hashStatus.state === 'running' && (
+                <div style={{
+                    background: 'var(--surface-2, #1e293b)',
+                    padding: '16px',
+                    borderRadius: '8px',
+                    marginBottom: '20px',
+                    border: '1px solid rgba(59, 130, 246, 0.3)'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span className="spinner" style={{ width: '16px', height: '16px', borderTopColor: '#60a5fa' }}></span>
+                            Hashing in progress...
+                        </div>
+                        <button className="btn btn-sm btn-danger" onClick={handleStopHashing}>Stop</button>
+                    </div>
+
+                    <div style={{ marginBottom: '8px', fontSize: '0.9rem', color: '#cbd5e1' }}>
+                        Processing: <span style={{ fontFamily: 'monospace' }}>{hashStatus.current_file ? hashStatus.current_file.split(/[/\\]/).pop() : 'Initializing...'}</span>
+                    </div>
+
+                    <div style={{
+                        height: '8px',
+                        background: 'rgba(255,255,255,0.1)',
+                        borderRadius: '4px',
+                        overflow: 'hidden',
+                        marginBottom: '8px'
+                    }}>
+                        <div style={{
+                            height: '100%',
+                            width: `${hashStatus.files_total > 0 ? (hashStatus.files_processed / hashStatus.files_total) * 100 : 0}%`,
+                            background: '#3b82f6',
+                            transition: 'width 0.3s ease'
+                        }} />
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', opacity: 0.7 }}>
+                        <span>{hashStatus.files_processed} / {hashStatus.files_total} files</span>
+                        <span>{hashStatus.queue_size} in queue</span>
+                    </div>
+                </div>
+            )}
+
             <div className="dashboard-actions">
                 <button
                     className="btn btn-primary"
@@ -97,9 +177,12 @@ export function DashboardScreen({ onNavigate }: DashboardScreenProps) {
                 >
                     {processing ? 'Processing...' : '🔄 Process Files'}
                 </button>
-                <button className="btn btn-secondary" onClick={handleStartHashing}>
-                    #️⃣ Start Hashing
-                </button>
+
+                {(!hashStatus || hashStatus.state !== 'running') && (
+                    <button className="btn btn-secondary" onClick={handleStartHashing}>
+                        #️⃣ Start Hashing
+                    </button>
+                )}
             </div>
 
             {loading ? (

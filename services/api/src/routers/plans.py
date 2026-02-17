@@ -66,6 +66,7 @@ async def get_plan(plan_id: int) -> dict:
 async def create_copy_plan(data: PlanCreate) -> dict:
     """
     Create a plan to make 2nd copies of all at-risk items (0-1 copies).
+    Distributes files across writable drives based on available capacity.
     Does not execute - preview only.
     """
     async with get_db() as db:
@@ -89,24 +90,38 @@ async def create_copy_plan(data: PlanCreate) -> dict:
             HAVING COUNT(mi.id) = 1
             """
         )
-        at_risk = await cursor.fetchall()
+        at_risk = [dict(row) for row in await cursor.fetchall()]
         
         if not at_risk:
             return {"message": "No at-risk items found", "plan_id": None}
         
-        # Get available destination drives
+        # Get writable drives with live free space
         cursor = await db.execute(
             """
-            SELECT id, mount_path 
+            SELECT id, mount_path, preferred
             FROM drives 
             WHERE never_write = 0 AND read_only = 0
-            ORDER BY preferred DESC
             """
         )
-        dest_drives = await cursor.fetchall()
+        dest_drives = []
+        for row in await cursor.fetchall():
+            try:
+                usage = shutil.disk_usage(row["mount_path"])
+                free = usage.free
+            except Exception:
+                free = 0
+            dest_drives.append({
+                "id": row["id"],
+                "mount_path": row["mount_path"],
+                "preferred": row["preferred"],
+                "remaining": free,  # Track remaining capacity as we assign files
+            })
         
         if not dest_drives:
             raise HTTPException(status_code=400, detail="No writable drives available")
+        
+        # Sort files largest-first so big files get placed while space still available
+        at_risk.sort(key=lambda x: x["size"] or 0, reverse=True)
         
         # Calculate total size
         total_size = sum(row["size"] or 0 for row in at_risk)
@@ -121,32 +136,50 @@ async def create_copy_plan(data: PlanCreate) -> dict:
         )
         plan_id = cursor.lastrowid
         
-        # Create plan items - assign to different drives than source
+        # Distribute files across drives based on available capacity
+        skipped = 0
+        assigned = 0
         for item in at_risk:
-            # Find a destination drive different from source
-            dest_drive = None
-            for d in dest_drives:
-                if d["id"] != item["source_drive_id"]:
-                    dest_drive = d
-                    break
+            file_size = item["size"] or 0
+            source_id = item["source_drive_id"]
             
-            if dest_drive:
-                await db.execute(
-                    """
-                    INSERT INTO plan_items (plan_id, action, source_file_id, dest_drive_id)
-                    VALUES (?, 'copy', ?, ?)
-                    """,
-                    (plan_id, item["file_id"], dest_drive["id"])
-                )
+            # Find the best destination: different from source, most remaining space
+            # Filter to drives that are not the source and have enough room
+            candidates = [
+                d for d in dest_drives
+                if d["id"] != source_id and d["remaining"] >= file_size
+            ]
+            
+            if not candidates:
+                # No drive has enough space — skip this file
+                skipped += 1
+                continue
+            
+            # Pick the drive with the most remaining space
+            best = max(candidates, key=lambda d: d["remaining"])
+            
+            await db.execute(
+                """
+                INSERT INTO plan_items (plan_id, action, source_file_id, dest_drive_id)
+                VALUES (?, 'copy', ?, ?)
+                """,
+                (plan_id, item["file_id"], best["id"])
+            )
+            
+            # Deduct from remaining capacity
+            best["remaining"] -= file_size
+            assigned += 1
         
         await db.commit()
         
         return {
             "plan_id": plan_id,
-            "item_count": len(at_risk),
+            "item_count": assigned,
+            "skipped_no_space": skipped,
             "total_bytes": total_size,
             "status": "draft"
         }
+
 
 
 @router.post("/reduce")
@@ -250,6 +283,7 @@ async def confirm_plan(plan_id: int) -> dict:
     """
     Confirm a plan and convert to queued operations.
     Only included items are converted.
+    Operations are created in plan_item ID order to preserve grouping.
     """
     if not is_write_enabled():
         raise HTTPException(status_code=403, detail="Write mode is not enabled")
@@ -262,11 +296,12 @@ async def confirm_plan(plan_id: int) -> dict:
         if not plan:
             raise HTTPException(status_code=404, detail="Plan not found or not in draft status")
         
-        # Get included items
+        # Get included items ORDER BY id to preserve creation order (grouped by media item)
         cursor = await db.execute(
             """
             SELECT * FROM plan_items 
             WHERE plan_id = ? AND included = 1
+            ORDER BY id ASC
             """,
             (plan_id,)
         )
@@ -277,10 +312,10 @@ async def confirm_plan(plan_id: int) -> dict:
         for item in items:
             await db.execute(
                 """
-                INSERT INTO operations (type, source_file_id, dest_drive_id, dest_path, status)
-                VALUES (?, ?, ?, ?, 'pending')
+                INSERT INTO operations (type, source_file_id, dest_drive_id, dest_path, status, plan_id)
+                VALUES (?, ?, ?, ?, 'pending', ?)
                 """,
-                (item["action"], item["source_file_id"], item["dest_drive_id"], item["dest_path"])
+                (item["action"], item["source_file_id"], item["dest_drive_id"], item["dest_path"], plan_id)
             )
             created_ops += 1
         
@@ -300,6 +335,111 @@ async def confirm_plan(plan_id: int) -> dict:
             "operations_created": created_ops,
             "status": "executed"
         }
+
+
+@router.get("/{plan_id}/execution")
+async def get_plan_execution(plan_id: int) -> dict:
+    """Get detailed execution progress for a plan."""
+    async with get_db() as db:
+        cursor = await db.execute("SELECT * FROM plans WHERE id = ?", (plan_id,))
+        plan = await cursor.fetchone()
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan not found")
+            
+        # Get operations summary
+        cursor = await db.execute(
+            """
+            SELECT status, COUNT(*) as count 
+            FROM operations 
+            WHERE plan_id = ?
+            GROUP BY status
+            """,
+            (plan_id,)
+        )
+        stats = {row["status"]: row["count"] for row in await cursor.fetchall()}
+        
+        total = sum(stats.values())
+        completed = stats.get("completed", 0)
+        failed = stats.get("failed", 0)
+        pending = stats.get("pending", 0)
+        running = stats.get("running", 0)
+        paused = stats.get("paused", 0)
+        
+        # Get current operation details
+        current_op = None
+        if running > 0:
+            cursor = await db.execute(
+                """
+                SELECT 
+                    o.id, o.type, o.source_file_id, 
+                    f.path, f.size,
+                    mi.title as media_title,
+                    d.mount_path as source_drive
+                FROM operations o
+                LEFT JOIN files f ON o.source_file_id = f.id
+                LEFT JOIN roots r ON f.root_id = r.id
+                LEFT JOIN drives d ON r.drive_id = d.id
+                LEFT JOIN media_item_files mif ON f.id = mif.file_id
+                LEFT JOIN media_items mi ON mif.media_item_id = mi.id
+                WHERE o.plan_id = ? AND o.status = 'running'
+                LIMIT 1
+                """,
+                (plan_id,)
+            )
+            row = await cursor.fetchone()
+            if row:
+                current_op = dict(row)
+        
+        # Determine overall execution status
+        status = "completed"
+        if running > 0 or pending > 0:
+            status = "running"
+        if paused > 0 and running == 0:
+            status = "paused"
+        if total == 0:
+            status = "idle"
+            
+        return {
+            "plan_id": plan_id,
+            "status": status,
+            "stats": {
+                "total": total,
+                "completed": completed,
+                "failed": failed,
+                "pending": pending,
+                "running": running,
+                "paused": paused
+            },
+            "current_operation": current_op
+        }
+
+
+@router.post("/{plan_id}/pause")
+async def pause_plan(plan_id: int) -> dict:
+    """Pause all pending operations for this plan."""
+    async with get_db() as db:
+        # Only pause pending operations. Running ones will finish.
+        await db.execute(
+            "UPDATE operations SET status = 'paused' WHERE plan_id = ? AND status = 'pending'",
+            (plan_id,)
+        )
+        changes = db.total_changes
+        await db.commit()
+        return {"message": "Plan paused", "paused_count": changes}
+
+
+@router.post("/{plan_id}/resume")
+async def resume_plan(plan_id: int) -> dict:
+    """Resume all paused operations for this plan."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE operations SET status = 'pending' WHERE plan_id = ? AND status = 'paused'",
+            (plan_id,)
+        )
+        changes = db.total_changes
+        await db.commit()
+        return {"message": "Plan resumed", "resumed_count": changes}
+
 
 
 @router.get("/{plan_id}/drive-impact")

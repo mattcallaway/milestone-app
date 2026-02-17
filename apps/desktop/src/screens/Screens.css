@@ -2029,3 +2029,26 @@
         transform: rotate(360deg);
     }
 }
+
+/* Plan Item Improvements */
+.item-info {
+    flex: 1;
+    min-width: 0;
+    /* Allow truncation */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.item-name {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.item-path-detail {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

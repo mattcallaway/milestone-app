@@ -38,6 +38,28 @@ interface DriveImpact {
     projected_utilization_pct: number;
 }
 
+interface ExecutionStatus {
+    plan_id: number;
+    status: 'running' | 'paused' | 'completed' | 'idle';
+    stats: {
+        total: number;
+        completed: number;
+        failed: number;
+        pending: number;
+        running: number;
+        paused: number;
+    };
+    current_operation: {
+        id: number;
+        type: string;
+        source_file_id: number;
+        path: string;
+        size: number;
+        media_title: string;
+        source_drive: string;
+    } | null;
+}
+
 function formatBytes(bytes: number): string {
     if (!bytes) return '0 B';
     const k = 1024;
@@ -55,16 +77,8 @@ export function PlanScreen() {
     const [creatingMessage, setCreatingMessage] = useState('');
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-    useEffect(() => {
-        loadPlans();
-    }, []);
+    const [executionStatus, setExecutionStatus] = useState<ExecutionStatus | null>(null);
 
-    // Elapsed time counter while creating
-    useEffect(() => {
-        if (!creating) { setElapsedSeconds(0); return; }
-        const interval = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
-        return () => clearInterval(interval);
-    }, [creating]);
 
     const loadPlans = async () => {
         try {
@@ -91,6 +105,32 @@ export function PlanScreen() {
             console.error('Failed to load plan:', err);
         }
     };
+
+    const loadExecutionStatus = async (planId: number) => {
+        try {
+            const res = await fetch(`${API_BASE}/plans/${planId}/execution`);
+            if (res.ok) {
+                const data = await res.json();
+                setExecutionStatus(data);
+            }
+        } catch (err) {
+            console.error('Failed to load execution status:', err);
+        }
+    };
+
+    useEffect(() => {
+        loadPlans();
+    }, []);
+
+    // Monitoring effect
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (selectedPlan && (selectedPlan.status === 'executed' || executionStatus?.status === 'running')) {
+            loadExecutionStatus(selectedPlan.id);
+            interval = setInterval(() => loadExecutionStatus(selectedPlan.id), 1000);
+        }
+        return () => clearInterval(interval);
+    }, [selectedPlan, executionStatus?.status]);
 
     const createCopyPlan = async () => {
         setCreating(true);
@@ -156,15 +196,40 @@ export function PlanScreen() {
 
     const confirmPlan = async () => {
         if (!selectedPlan) return;
-        if (!confirm('Execute this plan? Included items will be queued as operations.')) return;
+        if (!confirm('Execute this plan? Included items will be queued for progressive deletion.')) return;
         try {
             await fetch(`${API_BASE}/plans/${selectedPlan.id}/confirm`, { method: 'POST' });
-            setSelectedPlan(null);
             loadPlans();
-            alert('Plan executed! Operations queued.');
+            loadExecutionStatus(selectedPlan.id);
         } catch (err) {
             console.error('Failed to confirm plan:', err);
         }
+    };
+
+    const pausePlan = async () => {
+        if (!selectedPlan) return;
+        try {
+            await fetch(`${API_BASE}/plans/${selectedPlan.id}/pause`, { method: 'POST' });
+            loadExecutionStatus(selectedPlan.id);
+        } catch (err) {
+            console.error('Failed to pause plan:', err);
+        }
+    };
+
+    const resumePlan = async () => {
+        if (!selectedPlan) return;
+        try {
+            await fetch(`${API_BASE}/plans/${selectedPlan.id}/resume`, { method: 'POST' });
+            loadExecutionStatus(selectedPlan.id);
+        } catch (err) {
+            console.error('Failed to resume plan:', err);
+        }
+    };
+
+    const stopPlan = async () => {
+        if (!selectedPlan) return;
+        if (!confirm('Stop execution? Pending operations will be paused indefinitely (effectively stopped).')) return;
+        pausePlan();
     };
 
     const cancelPlan = async (planId: number) => {
@@ -259,7 +324,7 @@ export function PlanScreen() {
                                         <span className={`status-badge ${plan.status}`}>{plan.status}</span>
                                     </td>
                                     <td>
-                                        {plan.status === 'draft' && (
+                                        {plan.status === 'draft' ? (
                                             <>
                                                 <button
                                                     className="btn btn-sm"
@@ -274,6 +339,13 @@ export function PlanScreen() {
                                                     Cancel
                                                 </button>
                                             </>
+                                        ) : (
+                                            <button
+                                                className="btn btn-sm btn-secondary"
+                                                onClick={() => loadPlanDetail(plan.id)}
+                                            >
+                                                Monitor
+                                            </button>
                                         )}
                                     </td>
                                 </tr>
@@ -297,6 +369,106 @@ export function PlanScreen() {
                             </button>
                         )}
                     </div>
+
+                    {/* Execution Dashboard */}
+                    {executionStatus && (
+                        <div className="execution-dashboard" style={{
+                            background: 'var(--surface-2, #1e293b)',
+                            padding: '16px',
+                            borderRadius: '8px',
+                            marginBottom: '20px',
+                            border: '1px solid rgba(59, 130, 246, 0.3)'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <span style={{ fontSize: '1.2rem' }}>
+                                        {executionStatus.status === 'running' ? '⏳' :
+                                            executionStatus.status === 'paused' ? '⏸️' :
+                                                executionStatus.status === 'completed' ? '✅' : '⚪'}
+                                    </span>
+                                    <div>
+                                        <div style={{ fontWeight: 600, fontSize: '1.1rem' }}>
+                                            Execution: {executionStatus.status.toUpperCase()}
+                                        </div>
+                                        <div style={{ fontSize: '0.85em', opacity: 0.7 }}>
+                                            {executionStatus.stats.completed} done, {executionStatus.stats.pending} pending
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    {executionStatus.status === 'running' && (
+                                        <button className="btn btn-sm btn-warning" onClick={pausePlan}>⏸️ Pause</button>
+                                    )}
+                                    {executionStatus.status === 'paused' && (
+                                        <button className="btn btn-sm btn-primary" onClick={resumePlan}>▶️ Resume</button>
+                                    )}
+                                    {(executionStatus.status === 'running' || executionStatus.status === 'paused') && (
+                                        <button className="btn btn-sm btn-danger" onClick={stopPlan}>⏹️ Stop</button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Progress Bar */}
+                            <div style={{ marginBottom: '16px' }}>
+                                <div style={{ height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                                    <div style={{
+                                        height: '100%',
+                                        width: `${executionStatus.stats.total > 0 ? (executionStatus.stats.completed / executionStatus.stats.total) * 100 : 0}%`,
+                                        background: executionStatus.status === 'paused' ? '#f59e0b' : '#3b82f6',
+                                        transition: 'width 0.3s ease'
+                                    }} />
+                                </div>
+                            </div>
+
+                            {/* Current Operation */}
+                            {executionStatus.current_operation ? (
+                                <div style={{
+                                    background: 'rgba(0,0,0,0.2)',
+                                    padding: '12px',
+                                    borderRadius: '6px',
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.9em'
+                                }}>
+                                    <div style={{ color: '#93c5fd', marginBottom: '4px' }}>
+                                        Processing: {executionStatus.current_operation.media_title || 'Unknown Item'}
+                                    </div>
+                                    <div style={{ opacity: 0.7 }}>
+                                        {executionStatus.current_operation.type.toUpperCase()}: {executionStatus.current_operation.path}
+                                    </div>
+                                    <div style={{ opacity: 0.5, fontSize: '0.9em' }}>
+                                        From {executionStatus.current_operation.source_drive} ({formatBytes(executionStatus.current_operation.size)})
+                                    </div>
+                                </div>
+                            ) : executionStatus.status === 'running' ? (
+                                <div style={{ opacity: 0.6, fontSize: '0.9em', fontStyle: 'italic' }}>
+                                    Waiting for worker to pick up next task...
+                                </div>
+                            ) : null}
+                        </div>
+                    )}
+
+                    {selectedPlan.plan_type === 'reduction' && (
+                        <div style={{
+                            background: 'rgba(59, 130, 246, 0.1)',
+                            border: '1px solid rgba(59, 130, 246, 0.2)',
+                            padding: '12px 16px',
+                            borderRadius: '8px',
+                            marginBottom: '16px',
+                            color: '#93c5fd',
+                            display: 'flex',
+                            gap: '12px',
+                            alignItems: 'center'
+                        }}>
+                            <span style={{ fontSize: '1.5rem' }}>ℹ️</span>
+                            <div>
+                                <div style={{ fontWeight: 600, marginBottom: '2px' }}>Safety Check: Excess Copies Only</div>
+                                <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>
+                                    These items are <strong>extra duplicates</strong>. The system has verified that at least
+                                    2 other copies (including your primary/preferred versions) will remain safe.
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Drive Impact Summary */}
                     {driveImpact.length > 0 && (
@@ -375,9 +547,14 @@ export function PlanScreen() {
                                     disabled={selectedPlan.status !== 'draft'}
                                 />
                                 <span className={`action-badge ${item.action}`}>{item.action}</span>
-                                <span className="item-path" title={item.source_path}>
-                                    {item.source_path?.split(/[/\\]/).pop()}
-                                </span>
+                                <div className="item-info">
+                                    <div className="item-name" title={item.source_path}>
+                                        {item.source_path?.split(/[/\\]/).pop()}
+                                    </div>
+                                    <div className="item-path-detail" style={{ fontSize: '0.75rem', opacity: 0.5 }}>
+                                        {item.source_path}
+                                    </div>
+                                </div>
                                 <span className="item-size">{formatBytes(item.size)}</span>
                                 {item.dest_drive && (
                                     <span className="item-dest">→ {item.dest_drive}</span>
