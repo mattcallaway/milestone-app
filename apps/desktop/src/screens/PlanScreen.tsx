@@ -76,7 +76,7 @@ export function PlanScreen() {
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
     const [creatingMessage, setCreatingMessage] = useState('');
-    const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
 
     const [executionStatus, setExecutionStatus] = useState<ExecutionStatus | null>(null);
 
@@ -307,7 +307,6 @@ export function PlanScreen() {
                     <div>
                         <div style={{ fontWeight: 600 }}>{creatingMessage}</div>
                         <div style={{ fontSize: '0.85em', opacity: 0.7 }}>
-                            {elapsedSeconds > 0 && `${elapsedSeconds}s elapsed — `}
                             This may take a moment for large libraries.
                         </div>
                     </div>
