@@ -392,9 +392,11 @@ async def get_plan_execution(plan_id: int) -> dict:
         
         # Determine overall execution status
         status = "completed"
-        if running > 0 or pending > 0:
+        if plan["status"] == "cancelled":
+            status = "cancelled"
+        elif running > 0 or pending > 0:
             status = "running"
-        if paused > 0 and running == 0:
+        if paused > 0 and running == 0 and status != "cancelled":
             status = "paused"
         if total == 0:
             status = "idle"
@@ -440,6 +442,29 @@ async def resume_plan(plan_id: int) -> dict:
         await db.commit()
         return {"message": "Plan resumed", "resumed_count": changes}
 
+
+@router.post("/{plan_id}/cancel")
+async def cancel_plan_execution(plan_id: int) -> dict:
+    """Cancel all pending/paused operations for this plan and mark plan as cancelled."""
+    async with get_db() as db:
+        # Cancel pending/paused operations
+        await db.execute("""
+            UPDATE operations SET status = 'cancelled' 
+            WHERE plan_id = ? AND status IN ('pending', 'paused')
+            """,
+            (plan_id,)
+        )
+        ops_cancelled = db.total_changes
+        
+        # Mark plan as cancelled (if not already completed)
+        await db.execute("""
+            UPDATE plans SET status = 'cancelled' WHERE id = ?
+            """,
+            (plan_id,)
+        )
+        
+        await db.commit()
+        return {"message": "Plan execution cancelled", "cancelled_ops": ops_cancelled}
 
 
 @router.get("/{plan_id}/drive-impact")

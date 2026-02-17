@@ -40,12 +40,13 @@ interface DriveImpact {
 
 interface ExecutionStatus {
     plan_id: number;
-    status: 'running' | 'paused' | 'completed' | 'idle';
+    status: 'running' | 'paused' | 'completed' | 'idle' | 'cancelled';
     stats: {
         total: number;
         completed: number;
         failed: number;
         pending: number;
+
         running: number;
         paused: number;
     };
@@ -232,6 +233,19 @@ export function PlanScreen() {
         pausePlan();
     };
 
+    const scrapPlan = async () => {
+        if (!selectedPlan) return;
+        if (!confirm('Scrap this plan? All PENDING operations will be cancelled. Completed operations remain.')) return;
+        try {
+            await fetch(`${API_BASE}/plans/${selectedPlan.id}/cancel`, { method: 'POST' });
+            loadExecutionStatus(selectedPlan.id);
+            loadPlans();
+            loadPlanDetail(selectedPlan.id);
+        } catch (err) {
+            console.error('Failed to scrap plan:', err);
+        }
+    };
+
     const cancelPlan = async (planId: number) => {
         if (!confirm('Cancel and delete this plan?')) return;
         try {
@@ -242,6 +256,7 @@ export function PlanScreen() {
             console.error('Failed to cancel plan:', err);
         }
     };
+
 
     if (loading) return <div className="screen">Loading...</div>;
 
@@ -381,11 +396,11 @@ export function PlanScreen() {
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <span style={{ fontSize: '1.2rem' }}>
-                                        {executionStatus.status === 'running' ? '⏳' :
-                                            executionStatus.status === 'paused' ? '⏸️' :
-                                                executionStatus.status === 'completed' ? '✅' : '⚪'}
-                                    </span>
+                                    {executionStatus.status === 'running' && <span style={{ fontSize: '1.2rem' }}>⏳</span>}
+                                    {executionStatus.status === 'paused' && <span className="badge badge-warning">Paused</span>}
+                                    {executionStatus.status === 'completed' && <span className="badge badge-success">Completed</span>}
+                                    {executionStatus.status === 'cancelled' && <span className="badge badge-secondary" style={{ background: '#64748b' }}>Cancelled</span>}
+                                    {executionStatus.status === 'idle' && <span className="badge badge-secondary">Idle</span>}
                                     <div>
                                         <div style={{ fontWeight: 600, fontSize: '1.1rem' }}>
                                             Execution: {executionStatus.status.toUpperCase()}
@@ -403,7 +418,10 @@ export function PlanScreen() {
                                         <button className="btn btn-sm btn-primary" onClick={resumePlan}>▶️ Resume</button>
                                     )}
                                     {(executionStatus.status === 'running' || executionStatus.status === 'paused') && (
-                                        <button className="btn btn-sm btn-danger" onClick={stopPlan}>⏹️ Stop</button>
+                                        <>
+                                            <button className="btn btn-sm btn-danger" onClick={stopPlan} style={{ marginRight: '8px' }}>⏹️ Stop</button>
+                                            <button className="btn btn-sm btn-danger" onClick={scrapPlan} style={{ background: '#b91c1c' }}>🗑️ Scrap</button>
+                                        </>
                                     )}
                                 </div>
                             </div>
