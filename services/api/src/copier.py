@@ -2,7 +2,6 @@
 
 import os
 import shutil
-import hashlib
 import asyncio
 from typing import Optional, Callable
 from pathlib import Path
@@ -14,6 +13,30 @@ from .hasher import compute_full_hash
 CHUNK_SIZE = 1024 * 1024  # 1MB chunks for progress reporting
 
 
+def _copy_file_sync(
+    source: Path,
+    temp_dest: Path,
+    notify_progress: Optional[Callable[[int], None]],
+) -> None:
+    """
+    Blocking file copy with progress notifications.
+
+    Runs in a thread-pool executor — must NOT call asyncio APIs directly.
+    Use `notify_progress` (a thread-safe wrapper) instead of a raw callback.
+    """
+    with open(source, "rb") as src_file:
+        with open(temp_dest, "wb") as dst_file:
+            bytes_copied = 0
+            while True:
+                chunk = src_file.read(CHUNK_SIZE)
+                if not chunk:
+                    break
+                dst_file.write(chunk)
+                bytes_copied += len(chunk)
+                if notify_progress:
+                    notify_progress(bytes_copied)
+
+
 async def safe_copy(
     source_path: str,
     dest_path: str,
@@ -23,76 +46,75 @@ async def safe_copy(
 ) -> bool:
     """
     Safely copy a file with verification.
-    
+
     1. Check destination doesn't exist (unless overwrite=True)
-    2. Copy to temp file
+    2. Copy to temp file via thread-pool executor (non-blocking)
     3. Verify size matches
-    4. Optionally verify hash
-    5. Atomic rename to final destination
-    
-    Returns True on success, False on failure.
+    4. Optionally verify hash (also off the event loop)
+    5. Atomic replace to final destination
+
+    Returns True on success, raises on failure.
     """
     source = Path(source_path)
     dest = Path(dest_path)
     temp_dest = dest.with_suffix(dest.suffix + ".tmp")
-    
+
     # Validate source
     if not source.exists():
         raise FileNotFoundError(f"Source file not found: {source_path}")
-    
+
     if not source.is_file():
         raise ValueError(f"Source is not a file: {source_path}")
-    
+
     # Check destination
     if dest.exists() and not overwrite:
         raise FileExistsError(f"Destination already exists: {dest_path}")
-    
+
     # Ensure destination directory exists
     dest.parent.mkdir(parents=True, exist_ok=True)
-    
+
     source_size = source.stat().st_size
-    bytes_copied = 0
-    
+    loop = asyncio.get_event_loop()
+
+    # Build a thread-safe progress notifier: the callback may schedule async
+    # work (e.g. updating the DB), which must happen on the event loop thread,
+    # not from inside the worker thread.
+    def _threadsafe_notify(bytes_done: int) -> None:
+        if progress_callback:
+            loop.call_soon_threadsafe(progress_callback, bytes_done)
+
     try:
-        # Copy to temp file with progress
-        with open(source, "rb") as src_file:
-            with open(temp_dest, "wb") as dst_file:
-                while True:
-                    chunk = src_file.read(CHUNK_SIZE)
-                    if not chunk:
-                        break
-                    dst_file.write(chunk)
-                    bytes_copied += len(chunk)
-                    
-                    if progress_callback:
-                        progress_callback(bytes_copied)
-        
+        # Run blocking I/O in the thread pool — keeps the event loop free for
+        # other requests while a large file is being copied.
+        await loop.run_in_executor(
+            None, _copy_file_sync, source, temp_dest, _threadsafe_notify
+        )
+
         # Verify size
         temp_size = temp_dest.stat().st_size
         if temp_size != source_size:
             raise ValueError(f"Size mismatch: source={source_size}, copied={temp_size}")
-        
-        # Optionally verify hash
+
+        # Optionally verify hash — also blocking, so run off the event loop
         if verify_hash:
-            source_hash = compute_full_hash(str(source))
-            dest_hash = compute_full_hash(str(temp_dest))
-            
+            source_hash, dest_hash = await asyncio.gather(
+                loop.run_in_executor(None, compute_full_hash, str(source)),
+                loop.run_in_executor(None, compute_full_hash, str(temp_dest)),
+            )
             if source_hash != dest_hash:
-                raise ValueError(f"Hash mismatch after copy")
-        
-        # Atomic rename (remove existing if overwrite)
-        if dest.exists():
-            dest.unlink()
-        
-        temp_dest.rename(dest)
+                raise ValueError("Hash mismatch after copy")
+
+        # Atomic replace — single syscall, no window where both files are absent.
+        # Path.replace() calls os.replace() which is atomic on both Windows and Unix.
+        temp_dest.replace(dest)
         return True
-        
-    except Exception as e:
+
+    except Exception:
         # Clean up temp file on failure
         if temp_dest.exists():
             try:
                 temp_dest.unlink()
-            except:
+            except Exception:
                 pass
         raise
 

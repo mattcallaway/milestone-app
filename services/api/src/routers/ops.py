@@ -140,28 +140,6 @@ async def set_concurrency_endpoint(limit: int = Query(2, ge=1, le=10)) -> dict:
     return {"message": f"Concurrency set to {limit}", "status": get_queue_status()}
 
 
-@router.get("/{op_id}")
-async def get_operation(op_id: int) -> dict:
-    """Get operation details."""
-    async with get_db() as db:
-        cursor = await db.execute(
-            """
-            SELECT o.*, f.path as source_path, d.mount_path as dest_drive_path
-            FROM operations o
-            LEFT JOIN files f ON o.source_file_id = f.id
-            LEFT JOIN drives d ON o.dest_drive_id = d.id
-            WHERE o.id = ?
-            """,
-            (op_id,)
-        )
-        op = await cursor.fetchone()
-        
-        if not op:
-            raise HTTPException(status_code=404, detail="Operation not found")
-        
-        return dict(op)
-
-
 @router.post("/copy")
 async def create_copy(request: CopyRequest) -> dict:
     """Create a copy operation."""
@@ -227,10 +205,13 @@ async def get_destinations(file_id: int) -> dict:
 
 @router.post("/{op_id}/pause")
 async def pause_op(op_id: int) -> dict:
-    """Pause an operation."""
+    """Pause a pending operation."""
     success = await pause_operation(op_id)
     if not success:
-        raise HTTPException(status_code=400, detail="Cannot pause this operation")
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot pause this operation. Only pending operations can be paused; running copies cannot be interrupted mid-transfer."
+        )
     return {"message": "Operation paused", "id": op_id}
 
 
@@ -301,3 +282,27 @@ async def delete_rule(rule_id: int) -> dict:
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Rule not found")
         return {"message": "Rule deleted", "id": rule_id}
+
+
+# GET /{op_id} is registered last — it's a catch-all that would shadow any
+# literal sub-path (/rules, /destinations/..., /copy, etc.) if placed earlier.
+@router.get("/{op_id}")
+async def get_operation(op_id: int) -> dict:
+    """Get operation details."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            """
+            SELECT o.*, f.path as source_path, d.mount_path as dest_drive_path
+            FROM operations o
+            LEFT JOIN files f ON o.source_file_id = f.id
+            LEFT JOIN drives d ON o.dest_drive_id = d.id
+            WHERE o.id = ?
+            """,
+            (op_id,)
+        )
+        op = await cursor.fetchone()
+
+        if not op:
+            raise HTTPException(status_code=404, detail="Operation not found")
+
+        return dict(op)

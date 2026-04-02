@@ -137,16 +137,19 @@ async def run_hash_queue() -> None:
     _hash_status["current_file"] = None
 
 
-def start_hash_computation(file_ids: Optional[list[int]] = None) -> bool:
+async def start_hash_computation(file_ids: Optional[list[int]] = None) -> bool:
     """Start hashing files. If no file_ids provided, hash all pending files."""
     global _hash_queue, _hash_running
-    
+
     if _hash_running:
         return False
-    
+
     if file_ids:
         _hash_queue = file_ids.copy()
-    
+    else:
+        # Populate from DB — matches the documented behaviour
+        await queue_pending_files()
+
     asyncio.create_task(run_hash_queue())
     return True
 

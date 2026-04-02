@@ -80,6 +80,7 @@ async def scan_directory(
         for dirpath, dirnames, filenames in os.walk(root_path):
             # Check for cancel/pause
             if _cancel_requested:
+                await db.commit()  # persist progress up to this directory
                 log_event("scan_cancelled", {"root": root_path})
                 return stats
             
@@ -91,6 +92,7 @@ async def scan_directory(
             
             for filename in filenames:
                 if _cancel_requested:
+                    await db.commit()  # persist progress for files processed so far
                     return stats
                 
                 filepath = os.path.join(dirpath, filename)

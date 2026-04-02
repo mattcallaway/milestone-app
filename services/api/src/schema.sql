@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS files (
     quick_sig TEXT,
     full_hash TEXT,
     hash_status TEXT DEFAULT 'pending',
+    original_path TEXT,  -- set when quarantined; used for restore
     FOREIGN KEY (root_id) REFERENCES roots(id) ON DELETE CASCADE,
     UNIQUE(root_id, path)
 );

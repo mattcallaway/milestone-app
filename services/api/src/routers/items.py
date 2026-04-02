@@ -51,28 +51,31 @@ async def list_items(
             GROUP BY mi.id
         """
         
-        # Apply copy count filters in HAVING
+        # Apply copy count filters in HAVING — use ? placeholders, not f-strings
         having_conditions = []
+        having_params: list = []
         if min_copies is not None:
-            having_conditions.append(f"copy_count >= {min_copies}")
+            having_conditions.append("copy_count >= ?")
+            having_params.append(min_copies)
         if max_copies is not None:
-            having_conditions.append(f"copy_count <= {max_copies}")
-        
+            having_conditions.append("copy_count <= ?")
+            having_params.append(max_copies)
+
         if having_conditions:
             query += " HAVING " + " AND ".join(having_conditions)
-        
+
         query += " ORDER BY mi.title, mi.season, mi.episode"
-        
-        # Get total count (without pagination)
+
+        # Get total count (without pagination); params includes WHERE + HAVING values
         count_query = f"SELECT COUNT(*) FROM ({query})"
-        cursor = await db.execute(count_query, params)
+        cursor = await db.execute(count_query, params + having_params)
         total = (await cursor.fetchone())[0]
-        
-        # Apply pagination
+
+        # Apply pagination with bound parameters — never interpolate into SQL
         offset = (page - 1) * page_size
-        query += f" LIMIT {page_size} OFFSET {offset}"
-        
-        cursor = await db.execute(query, params)
+        query += " LIMIT ? OFFSET ?"
+
+        cursor = await db.execute(query, params + having_params + [page_size, offset])
         rows = await cursor.fetchall()
         
         items = []

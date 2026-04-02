@@ -51,9 +51,18 @@ async def get_deletion_recommendations(
             (min_copies, limit)
         )
         items = [dict(row) for row in await cursor.fetchall()]
-        
+
+        # Fetch preferred drives once — reused for every item in the loop below.
+        cursor = await db.execute(
+            """
+            SELECT drive_id FROM user_rules
+            WHERE rule_type IN ('prefer_all', 'prefer_movie', 'prefer_tv')
+            """
+        )
+        preferred_drives = {row["drive_id"] for row in await cursor.fetchall()}
+
         recommendations = []
-        
+
         for item in items:
             # Get all files for this item
             cursor = await db.execute(
@@ -70,15 +79,6 @@ async def get_deletion_recommendations(
                 (item["item_id"],)
             )
             files = [dict(row) for row in await cursor.fetchall()]
-            
-            # Get preferred drives
-            cursor = await db.execute(
-                """
-                SELECT drive_id FROM user_rules 
-                WHERE rule_type IN ('prefer_all', 'prefer_movie', 'prefer_tv')
-                """
-            )
-            preferred_drives = {row["drive_id"] for row in await cursor.fetchall()}
             
             # Determine which to keep vs delete
             keep = []
@@ -140,17 +140,20 @@ async def get_deletion_recommendations(
 async def quarantine_files(request: QuarantineRequest) -> dict:
     """
     Move files to quarantine folder (reversible delete).
-    Files are moved to {drive}/.quarantine/{date}/{original_path}
+    Files are moved to {drive}/.quarantine/{date}/{relative_path}
+
+    Each file is committed independently so a failure on one file does not
+    affect files that were already successfully quarantined.
     """
     if not request.file_ids:
         raise HTTPException(status_code=400, detail="No file IDs provided")
-    
-    async with get_db() as db:
-        moved = []
-        errors = []
-        date_str = datetime.now().strftime("%Y-%m-%d")
-        
-        for file_id in request.file_ids:
+
+    moved = []
+    errors = []
+    date_str = datetime.now().strftime("%Y-%m-%d")
+
+    for file_id in request.file_ids:
+        async with get_db() as db:
             cursor = await db.execute(
                 """
                 SELECT f.id, f.path, r.drive_id, d.mount_path
@@ -162,109 +165,121 @@ async def quarantine_files(request: QuarantineRequest) -> dict:
                 (file_id,)
             )
             file_info = await cursor.fetchone()
-            
+
             if not file_info:
                 errors.append({"file_id": file_id, "error": "File not found"})
                 continue
-            
+
             source_path = file_info["path"]
             drive_mount = file_info["mount_path"]
-            
+
             if not os.path.exists(source_path):
                 errors.append({"file_id": file_id, "error": "File does not exist on disk"})
                 continue
-            
+
             # Build quarantine path
             if request.quarantine_path:
                 quarantine_base = request.quarantine_path
             else:
                 quarantine_base = os.path.join(drive_mount, ".quarantine", date_str)
-            
-            # Preserve relative path structure
+
+            # Preserve relative path structure within the drive
             rel_path = os.path.relpath(source_path, drive_mount)
             quarantine_dest = os.path.join(quarantine_base, rel_path)
-            
+
             try:
                 os.makedirs(os.path.dirname(quarantine_dest), exist_ok=True)
                 shutil.move(source_path, quarantine_dest)
-                
-                # Update database - mark file as quarantined
+
+                # Store original_path so restore doesn't need to reconstruct it.
+                # Commit immediately — if a later file fails, this one stays recorded.
                 await db.execute(
-                    "UPDATE files SET path = ?, hash_status = 'quarantined' WHERE id = ?",
-                    (quarantine_dest, file_id)
+                    """UPDATE files
+                       SET path = ?, original_path = ?, hash_status = 'quarantined'
+                       WHERE id = ?""",
+                    (quarantine_dest, source_path, file_id)
                 )
-                
+                await db.commit()
+
                 moved.append({
                     "file_id": file_id,
                     "original_path": source_path,
                     "quarantine_path": quarantine_dest
                 })
             except Exception as e:
+                await db.rollback()
                 errors.append({"file_id": file_id, "error": str(e)})
-        
-        await db.commit()
-        
-        return {
-            "moved": len(moved),
-            "errors": len(errors),
-            "files": moved,
-            "error_details": errors
-        }
+
+    return {
+        "moved": len(moved),
+        "errors": len(errors),
+        "files": moved,
+        "error_details": errors
+    }
 
 
 @router.post("/restore")
 async def restore_from_quarantine(file_ids: list[int]) -> dict:
-    """Restore quarantined files to their original locations."""
-    async with get_db() as db:
-        restored = []
-        errors = []
-        
-        for file_id in file_ids:
+    """
+    Restore quarantined files to their original locations.
+
+    Uses the `original_path` column recorded at quarantine time rather than
+    trying to reconstruct the path from the quarantine folder structure.
+    Each file is committed independently.
+    """
+    restored = []
+    errors = []
+
+    for file_id in file_ids:
+        async with get_db() as db:
             cursor = await db.execute(
-                "SELECT id, path FROM files WHERE id = ? AND hash_status = 'quarantined'",
+                """SELECT id, path, original_path
+                   FROM files
+                   WHERE id = ? AND hash_status = 'quarantined'""",
                 (file_id,)
             )
             file_info = await cursor.fetchone()
-            
+
             if not file_info:
                 errors.append({"file_id": file_id, "error": "File not found or not quarantined"})
                 continue
-            
+
             quarantine_path = file_info["path"]
-            
-            # Extract original path from quarantine structure
-            # Path format: {drive}/.quarantine/{date}/{relative_path}
-            parts = quarantine_path.split(".quarantine")
-            if len(parts) == 2:
-                drive = parts[0].rstrip(os.sep)
-                # Skip date folder
-                rel_parts = parts[1].split(os.sep)[2:]  # Skip empty + date
-                original_path = os.path.join(drive, *rel_parts)
-            else:
-                errors.append({"file_id": file_id, "error": "Cannot determine original path"})
+            original_path = file_info["original_path"]
+
+            if not original_path:
+                # Fallback for files quarantined before this column was added
+                errors.append({"file_id": file_id, "error": "No original path recorded; cannot restore automatically"})
                 continue
-            
+
+            if not os.path.exists(quarantine_path):
+                errors.append({"file_id": file_id, "error": "Quarantined file not found on disk"})
+                continue
+
             try:
                 os.makedirs(os.path.dirname(original_path), exist_ok=True)
                 shutil.move(quarantine_path, original_path)
-                
+
+                # Clear quarantine fields and commit immediately
                 await db.execute(
-                    "UPDATE files SET path = ?, hash_status = 'pending' WHERE id = ?",
+                    """UPDATE files
+                       SET path = ?, original_path = NULL, hash_status = 'pending'
+                       WHERE id = ?""",
                     (original_path, file_id)
                 )
-                
+                await db.commit()
+
                 restored.append({
                     "file_id": file_id,
                     "restored_path": original_path
                 })
             except Exception as e:
+                await db.rollback()
                 errors.append({"file_id": file_id, "error": str(e)})
-        
-        await db.commit()
-        
-        return {
-            "restored": len(restored),
-            "errors": len(errors),
-            "files": restored,
-            "error_details": errors
-        }
+
+    return {
+        "restored": len(restored),
+        "errors": len(errors),
+        "files": restored,
+        "error_details": errors
+    }

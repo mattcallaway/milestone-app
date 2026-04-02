@@ -91,13 +91,20 @@ async def process_operation(op: dict, progress_callback: Optional[Callable] = No
         await update_operation_status(op_id, "running")
         
         if op["type"] == "copy":
+            loop = asyncio.get_event_loop()
+
+            # Called from the event loop thread via call_soon_threadsafe in copier.py.
+            # asyncio.create_task is safe here since we are on the event loop.
+            def _on_progress(bytes_done: int) -> None:
+                loop.create_task(
+                    update_operation_status(op_id, "running", progress=bytes_done)
+                )
+
             success = await safe_copy(
                 source_path=op["source_path"],
                 dest_path=op["dest_path"],
                 verify_hash=bool(op.get("verify_hash", 0)),
-                progress_callback=lambda p: asyncio.create_task(
-                    update_operation_status(op_id, "running", progress=p)
-                ) if progress_callback is None else progress_callback(p)
+                progress_callback=progress_callback if progress_callback is not None else _on_progress,
             )
             
             if success:
@@ -182,13 +189,14 @@ def set_concurrency(limit: int):
 
 
 async def pause_operation(op_id: int) -> bool:
-    """Pause a specific operation."""
+    """Pause a specific operation. Only pending operations can be paused;
+    running copies cannot be interrupted mid-transfer."""
     async with get_db() as db:
         cursor = await db.execute(
             "SELECT status FROM operations WHERE id = ?", (op_id,)
         )
         row = await cursor.fetchone()
-        if row and row["status"] in ("pending", "running"):
+        if row and row["status"] == "pending":
             await update_operation_status(op_id, "paused")
             return True
     return False

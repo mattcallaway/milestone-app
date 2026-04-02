@@ -22,12 +22,11 @@ async def compute_hashes(file_ids: list[int] | None = None) -> dict:
         count = await queue_pending_files()
         if count == 0:
             return {"message": "No pending files to hash", "queued": 0}
-        file_ids = None  # Will use the queue
-    
-    success = start_hash_computation(file_ids)
+
+    success = await start_hash_computation(file_ids)
     if not success:
         return {"error": "Hash computation already running"}
-    
+
     status = get_hash_status()
     return {"message": "Hash computation started", "status": status}
 
