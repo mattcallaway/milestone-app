@@ -469,3 +469,84 @@ export const failureDomainApi = {
         return request('DELETE', `/failure-domains/${domainId}/drives/${driveId}`);
     },
 };
+
+// ── Simulation types ───────────────────────────────────────────────────────────
+
+export interface SimDrive {
+    id: number;
+    mount_path: string;
+    volume_label: string | null;
+    domain_id: number | null;
+    domain_name: string | null;
+    file_count: number;
+    item_count: number;
+}
+
+export interface SimDomain {
+    id: number;
+    name: string;
+    description: string | null;
+    drive_count: number;
+    item_count: number;
+}
+
+export interface SimulationItem {
+    id: number;
+    title: string;
+    type: string;
+    status: string;
+    severity: 'lost' | 'degraded_1_copy' | 'degraded_domain' | 'still_safe' | 'unaffected';
+    current_copies: number;
+    remaining_copies: number;
+    current_distinct_domains: number;
+    remaining_distinct_domains: number;
+    size_bytes: number;
+    affected_files: { file_id: number; path: string; size: number | null }[];
+    surviving_files: { file_id: number; path: string; drive_id: number; domain_id: number | null }[];
+}
+
+export interface SimulationAction {
+    item_id: number;
+    item_title: string;
+    action: string;
+    reason: string;
+    source_file: string | null;
+    source_drive_id: number | null;
+}
+
+export interface SimulationResult {
+    scope: 'drive' | 'domain';
+    target_id: number;
+    target_label: string;
+    scope_label: string;
+    failed_drive_count?: number;
+    summary: {
+        lost_entirely: number;
+        degraded_to_1_copy: number;
+        degraded_to_single_domain: number;
+        still_safe: number;
+        unaffected: number;
+        total_affected: number;
+    };
+    items: SimulationItem[];
+    recommended_actions: SimulationAction[];
+}
+
+// Simulation API
+export const simulationApi = {
+    async listDrives(): Promise<{ drives: SimDrive[] }> {
+        return request('GET', '/simulation/drives');
+    },
+
+    async listDomains(): Promise<{ domains: SimDomain[] }> {
+        return request('GET', '/simulation/domains');
+    },
+
+    async runDrive(driveId: number): Promise<SimulationResult> {
+        return request('GET', `/simulation/drive/${driveId}`);
+    },
+
+    async runDomain(domainId: number): Promise<SimulationResult> {
+        return request('GET', `/simulation/domain/${domainId}`);
+    },
+};

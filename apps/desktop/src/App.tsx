@@ -10,8 +10,9 @@ import { ItemDetailScreen } from './screens/ItemDetailScreen';
 import { OperationsScreen } from './screens/OperationsScreen';
 import { CleanupScreen } from './screens/CleanupScreen';
 import { FailureDomainsScreen } from './screens/FailureDomainsScreen';
+import { SimulationScreen } from './screens/SimulationScreen';
 
-type Screen = 'dashboard' | 'drives' | 'roots' | 'scan' | 'library' | 'items' | 'item-detail' | 'operations' | 'cleanup' | 'failure-domains';
+type Screen = 'dashboard' | 'drives' | 'roots' | 'scan' | 'library' | 'items' | 'item-detail' | 'operations' | 'cleanup' | 'failure-domains' | 'simulation';
 
 interface ScreenParams {
     itemId?: number;
@@ -67,6 +68,8 @@ function App() {
                 return <CleanupScreen />;
             case 'failure-domains':
                 return <FailureDomainsScreen />;
+            case 'simulation':
+                return <SimulationScreen />;
             default:
                 return <DashboardScreen onNavigate={handleNavigate} />;
         }

@@ -1534,4 +1534,249 @@
     padding: 8px 12px;
     background: rgba(255, 255, 255, 0.03);
     border-radius: 8px;
-}
+}
+
+/* ── Simulation screen ──────────────────────────────────────────────────────── */
+
+.sim-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 28px;
+    padding: 18px 20px;
+    background: #1a1a1a;
+    border: 1px solid #2a2a4a;
+    border-radius: 12px;
+}
+
+.sim-scope-toggle {
+    display: flex;
+    gap: 10px;
+}
+
+.sim-picker-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.sim-picker-row .input {
+    flex: 1;
+    min-width: 260px;
+}
+
+/* Summary cards */
+.sim-summary-header {
+    margin-bottom: 16px;
+}
+
+.sim-summary-header h3 {
+    margin: 0;
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+.sim-target-name {
+    color: #667eea;
+    font-weight: 600;
+}
+
+.sim-summary-cards {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 28px;
+}
+
+@media (max-width: 900px) {
+    .sim-summary-cards {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.sim-card {
+    border-radius: 10px;
+    padding: 18px 14px;
+    text-align: center;
+    border: 2px solid transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.sim-card-value {
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+}
+
+.sim-card-label {
+    font-size: 0.8rem;
+    color: #aaa;
+}
+
+.sim-card-lost {
+    background: rgba(244, 67, 54, 0.1);
+    border-color: rgba(244, 67, 54, 0.4);
+}
+
+.sim-card-degraded1 {
+    background: rgba(255, 87, 34, 0.1);
+    border-color: rgba(255, 87, 34, 0.4);
+}
+
+.sim-card-degraded-domain {
+    background: rgba(255, 152, 0, 0.08);
+    border-color: rgba(255, 152, 0, 0.35);
+}
+
+.sim-card-safe {
+    background: rgba(76, 175, 80, 0.08);
+    border-color: rgba(76, 175, 80, 0.35);
+}
+
+.sim-card-unaffected {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Actions section */
+.sim-actions-section {
+    margin-bottom: 24px;
+}
+
+.sim-actions-section h3 {
+    margin: 0 0 12px;
+    font-size: 1rem;
+    color: #888;
+    font-weight: 500;
+}
+
+.sim-actions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sim-action-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.sim-action-already_at_risk {
+    border-color: rgba(244, 67, 54, 0.3);
+    background: rgba(244, 67, 54, 0.05);
+}
+
+.sim-action-backup_before_failure {
+    border-color: rgba(255, 87, 34, 0.3);
+    background: rgba(255, 87, 34, 0.05);
+}
+
+.sim-action-copy_to_different_domain {
+    border-color: rgba(255, 152, 0, 0.3);
+    background: rgba(255, 152, 0, 0.05);
+}
+
+.sim-action-icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.sim-action-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sim-action-source code {
+    font-size: 0.8rem;
+    color: #667eea;
+    font-family: monospace;
+    word-break: break-all;
+}
+
+/* Export bar */
+.sim-export-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+    padding: 12px 0;
+    border-top: 1px solid #2a2a4a;
+    border-bottom: 1px solid #2a2a4a;
+}
+
+/* Table section */
+.sim-table-section h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: #888;
+    font-weight: 500;
+}
+
+.sim-table-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 12px;
+}
+
+.sim-table {
+    width: 100%;
+}
+
+.sim-severity-badge {
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.sim-title-cell {
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sim-row-lost {
+    background: rgba(244, 67, 54, 0.05);
+}
+
+.sim-row-degraded_1_copy {
+    background: rgba(255, 87, 34, 0.04);
+}
+
+.sim-row-degraded_domain {
+    background: rgba(255, 152, 0, 0.03);
+}
+
+/* Idle state */
+.sim-idle-state {
+    text-align: center;
+    padding: 64px 32px;
+    color: #666;
+}
+
+.sim-idle-icon {
+    font-size: 4rem;
+    margin-bottom: 16px;
+}
+
+.sim-idle-state p {
+    margin: 0 0 8px;
+    font-size: 1rem;
+    color: #888;
+}
+
