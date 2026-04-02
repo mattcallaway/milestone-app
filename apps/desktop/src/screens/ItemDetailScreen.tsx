@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api, MediaItemDetail } from '../api';
+import { SidecarPanel } from '../components/SidecarPanel';
 import './Screens.css';
 
 interface ItemDetailScreenProps {
@@ -227,6 +228,11 @@ export function ItemDetailScreen({ itemId, onBack }: ItemDetailScreenProps) {
                                 </div>
                             ))}
                         </div>
+                    </section>
+
+                    {/* Companion files / sidecars */}
+                    <section className="detail-section">
+                        <SidecarPanel itemId={itemId} />
                     </section>
 
                     <section className="detail-section">

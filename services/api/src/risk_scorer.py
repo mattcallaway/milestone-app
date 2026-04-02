@@ -77,31 +77,37 @@ def compute_risk_score(item: dict[str, Any]) -> dict[str, Any]:
     Parameters
     ----------
     item : dict with keys:
-        resilience_state : str | None
+        resilience_state        : str | None
         domain_mapping_complete : bool
-        status : str   ('auto' | 'verified' | 'needs_verification')
-        total_size_bytes : int
-        drive_healths : list[str]   health_status of every drive holding a copy
-        copy_count : int
+        status                  : str   ('auto' | 'verified' | 'needs_verification')
+        total_size_bytes        : int
+        drive_healths           : list[str]   health_status of every drive holding a copy
+        copy_count              : int
+        sidecar_completeness    : str | None  ('complete'|'partial'|'no_sidecars'|None)
+                                  — informational only; does NOT change risk score.
+                                    Missing sidecars are tracked as completeness,
+                                    not as a safety risk.
 
     Returns
     -------
     dict with:
-        score               : int (0–100)
-        base_score          : int
-        health_modifier     : int
+        score                 : int (0–100)
+        base_score            : int
+        health_modifier       : int
         verification_modifier : int
-        domain_modifier     : int
-        size_bonus          : int
-        factors             : list[str]   human-readable factor explanations
-        recommended_action  : str
-        improvement_if_acted : int   how much the score would drop
+        domain_modifier       : int
+        size_bonus            : int
+        sidecar_completeness  : str | None
+        factors               : list[str]   human-readable factor explanations
+        recommended_action    : str
+        improvement_if_acted  : int   how much the score would drop
     """
     resilience_state: str | None = item.get("resilience_state")
     domain_complete: bool = item.get("domain_mapping_complete", False)
     status: str = item.get("status", "auto")
     size_bytes: int = item.get("total_size_bytes", 0)
     drive_healths: list[str] = item.get("drive_healths", [])
+    sidecar_completeness: str | None = item.get("sidecar_completeness")
 
     factors: list[str] = []
 
@@ -141,6 +147,12 @@ def compute_risk_score(item: dict[str, Any]) -> dict[str, Any]:
     raw_score = base + health_mod + verif_mod + domain_mod + size_bonus
     score = max(0, min(100, raw_score))
 
+    # Sidecar completeness note (informational — does NOT change risk score)
+    if sidecar_completeness == "partial":
+        factors.append("⚠️ Sidecar completeness: partial (some backup copies missing sidecars)")
+    elif sidecar_completeness == "complete":
+        factors.append("✅ Sidecar completeness: complete")
+
     # Recommended single action
     action, improvement = _recommend_action(resilience_state, domain_complete, status, worst_health)
 
@@ -151,6 +163,7 @@ def compute_risk_score(item: dict[str, Any]) -> dict[str, Any]:
         "verification_modifier": verif_mod,
         "domain_modifier": domain_mod,
         "size_bonus": size_bonus,
+        "sidecar_completeness": sidecar_completeness,
         "factors": factors,
         "recommended_action": action,
         "improvement_if_acted": improvement,

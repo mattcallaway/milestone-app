@@ -631,3 +631,101 @@ export const riskApi = {
         return request('GET', `/risk/placement/${itemId}`);
     },
 };
+
+// ── Sidecar types ─────────────────────────────────────────────────────────────
+
+export interface SidecarFile {
+    path: string;
+    category: 'subtitle' | 'metadata' | 'artwork';
+    ext: string;
+    size?: number | null;
+}
+
+export interface SidecarCopy {
+    file_id: number;
+    primary_path: string;
+    drive_id: number;
+    drive_mount: string;
+    domain_id: number | null;
+    sidecars: SidecarFile[];
+    sidecar_count: number;
+}
+
+export interface SidecarDriveDetail {
+    sidecars: string[];
+    missing: string[];
+    extra: string[];
+}
+
+export interface SidecarCompleteness {
+    item_id: number;
+    completeness: 'complete' | 'partial' | 'no_sidecars';
+    total_unique_sidecars: number;
+    missing_on_any_drive: boolean;
+    copy_count: number;
+    all_covered_categories: string[];
+    policy: Record<string, boolean>;
+    drives: Record<number, SidecarDriveDetail>;
+}
+
+export interface SidecarManifestEntry {
+    path: string;
+    role: 'primary' | 'subtitle' | 'metadata' | 'artwork';
+    size?: number | null;
+}
+
+export interface SidecarManifest {
+    item_id: number;
+    source_drive_id: number;
+    policy: Record<string, boolean>;
+    manifest: SidecarManifestEntry[];
+    file_count: number;
+    total_size_bytes: number;
+}
+
+// Sidecar API
+export const sidecarApi = {
+    async getSidecars(itemId: number): Promise<{ item_id: number; copies: SidecarCopy[] }> {
+        return request('GET', `/items/${itemId}/sidecars`);
+    },
+
+    async getCompleteness(
+        itemId: number,
+        includeSubtitles = true,
+        includeMetadata = true,
+        includeArtwork = false,
+    ): Promise<SidecarCompleteness> {
+        const params = new URLSearchParams({
+            include_subtitles: String(includeSubtitles),
+            include_metadata: String(includeMetadata),
+            include_artwork: String(includeArtwork),
+        });
+        return request('GET', `/items/${itemId}/sidecars/completeness?${params}`);
+    },
+
+    async getManifest(
+        itemId: number,
+        sourceDriveId: number,
+        includeSubtitles = true,
+        includeMetadata = true,
+        includeArtwork = false,
+    ): Promise<SidecarManifest> {
+        const params = new URLSearchParams({
+            source_drive_id: String(sourceDriveId),
+            include_subtitles: String(includeSubtitles),
+            include_metadata: String(includeMetadata),
+            include_artwork: String(includeArtwork),
+        });
+        return request('GET', `/items/${itemId}/sidecars/manifest?${params}`);
+    },
+
+    async getReport(limit = 50): Promise<{
+        total_scanned: number;
+        complete: object[];
+        partial: object[];
+        no_sidecars: object[];
+        summary: { complete_count: number; partial_count: number; no_sidecars_count: number };
+    }> {
+        return request('GET', `/sidecars/report?limit=${limit}`);
+    },
+};
