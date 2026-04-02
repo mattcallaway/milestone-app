@@ -1,7 +1,18 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
 import * as path from 'path';
 
-// Safe-by-default: Check WRITE_MODE environment variable
+// Diagnostics for dev setup
+const isElectron = !!(process.versions && process.versions.electron);
+if (!isElectron) {
+    console.error('ERROR: This process is running as standard Node.js, not Electron.');
+    console.error('Ensure you are launching the app via "electron" and not "node".');
+    if (process.env.ELECTRON_RUN_AS_NODE) {
+        console.error('Resolution: Unset ELECTRON_RUN_AS_NODE environment variable.');
+    }
+    process.exit(1);
+}
+
+const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 const isWriteMode = process.env.WRITE_MODE === 'true';
 
 function createWindow(): void {
@@ -15,17 +26,28 @@ function createWindow(): void {
         },
     });
 
-    // In development, load from Vite dev server
-    if (process.env.NODE_ENV === 'development') {
-        mainWindow.loadURL('http://localhost:5173');
+    if (isDev) {
+        // In development, prefer the URL from Vite dev server if passed
+        const devServerUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
+        console.log(`[DEV] Loading from: ${devServerUrl}`);
+        
+        mainWindow.loadURL(devServerUrl).catch((err) => {
+            console.error(`[DEV] Failed to load ${devServerUrl}:`, err);
+            dialog.showErrorBox(
+                'Dev Server unreachable',
+                `Electron could not connect to the Vite dev server at ${devServerUrl}. \n\nPlease make sure the dev server is running before starting Electron.`
+            );
+        });
+        
         mainWindow.webContents.openDevTools();
     } else {
         // In production, load the built index.html
-        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+        const indexPath = path.join(__dirname, '../dist/index.html');
+        console.log(`[PROD] Loading from: ${indexPath}`);
+        mainWindow.loadFile(indexPath);
     }
 
-    // Log the current mode
-    console.log(`Running in ${isWriteMode ? 'WRITE' : 'READ-ONLY'} mode`);
+    console.log(`Milestone running in ${isWriteMode ? 'WRITE' : 'READ-ONLY'} mode`);
 }
 
 app.whenReady().then(() => {

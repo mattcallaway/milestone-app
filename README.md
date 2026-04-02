@@ -567,6 +567,41 @@ npm run dev
 
 This starts the Vite dev server (port 5173) and the Electron shell simultaneously.
 
+> [!TIP]
+> **Windows/IDE Development Note:** 
+> If the Electron window is blank or fails to launch from your terminal/IDE:
+> 1. Ensure `ELECTRON_RUN_AS_NODE` is not set (`$env:ELECTRON_RUN_AS_NODE=$null` in PowerShell).
+> 2. Use `npm.cmd run dev` if `npm` is blocked by PowerShell execution policies.
+> 3. Verify that Vite is running on `http://localhost:5173` before starting Electron.
+
+---
+
+## Windows Development Quick Start
+
+For a reliable development experience on Windows:
+
+1. **Environment Clean Up**:
+   ```powershell
+   # Open PowerShell and ensure no stale Electron variables are set
+   $env:ELECTRON_RUN_AS_NODE = $null
+   $env:NODE_ENV = "development"
+   ```
+
+2. **Sequential Startup** (if `npm run dev` fails):
+   ```powershell
+   # Terminal 1: Start the renderer
+   cd apps/desktop
+   npm run dev:renderer
+
+   # Terminal 2: Once Vite is ready, start the main process
+   cd apps/desktop
+   npm run dev:main
+   ```
+
+3. **Common Diagnoses**:
+   - **Blank Window**: Electron is failing to load the dev URL. Check if Vite is on a port other than `5173`.
+   - **Error: app.whenReady is undefined**: You are running in standard Node.js mode. Unset `ELECTRON_RUN_AS_NODE`.
+
 ---
 
 ## Using Milestone

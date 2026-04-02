@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { sidecarApi, SidecarCopy, SidecarCompleteness } from '../api';
-import './Screens.css';
+import '../screens/Screens.css';
 
 interface SidecarPanelProps {
     itemId: number;

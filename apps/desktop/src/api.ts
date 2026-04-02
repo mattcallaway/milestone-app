@@ -4,10 +4,15 @@
 
 const API_BASE = 'http://127.0.0.1:8000';
 
+async function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function request<T>(
     method: string,
     path: string,
-    body?: unknown
+    body?: unknown,
+    retries = 3
 ): Promise<T> {
     const options: RequestInit = {
         method,
@@ -20,14 +25,23 @@ async function request<T>(
         options.body = JSON.stringify(body);
     }
 
-    const response = await fetch(`${API_BASE}${path}`, options);
+    try {
+        const response = await fetch(`${API_BASE}${path}`, options);
 
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-        throw new Error(error.detail || `HTTP ${response.status}`);
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+            throw new Error(error.detail || `HTTP ${response.status}`);
+        }
+
+        return response.json();
+    } catch (err) {
+        if (retries > 0 && err instanceof TypeError && err.message.includes('fetch')) {
+            console.log(`[API] Retrying ${path} (${retries} left)...`);
+            await sleep(1000);
+            return request(method, path, body, retries - 1);
+        }
+        throw err;
     }
-
-    return response.json();
 }
 
 // Types
