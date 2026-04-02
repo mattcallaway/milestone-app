@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react';
 import { api, Drive } from '../api';
 import './Screens.css';
 
-export function DrivesScreen() {
+interface DrivesScreenProps {
+    onNavigate?: (screen: string) => void;
+}
+
+export function DrivesScreen({ onNavigate }: DrivesScreenProps) {
     const [drives, setDrives] = useState<Drive[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -108,6 +112,26 @@ export function DrivesScreen() {
                                 <div className="card-title">
                                     <h3>{drive.mount_path}</h3>
                                     <span className="card-label">{drive.volume_label || 'Unknown Volume'}</span>
+                                    {/* Domain badge */}
+                                    {drive.domain_name ? (
+                                        <span
+                                            className="badge badge-domain"
+                                            title="Failure domain"
+                                            onClick={() => onNavigate?.('failure-domains')}
+                                            style={{ cursor: onNavigate ? 'pointer' : 'default' }}
+                                        >
+                                            🏷️ {drive.domain_name}
+                                        </span>
+                                    ) : (
+                                        <span
+                                            className="badge badge-warning"
+                                            title="No failure domain assigned — resilience analysis incomplete"
+                                            onClick={() => onNavigate?.('failure-domains')}
+                                            style={{ cursor: onNavigate ? 'pointer' : 'default' }}
+                                        >
+                                            ⚠️ No domain
+                                        </span>
+                                    )}
                                 </div>
                                 <button
                                     className="btn btn-icon btn-danger"

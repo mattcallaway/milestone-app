@@ -39,7 +39,24 @@ export interface Drive {
     created_at: string;
     free_space: number | null;
     total_space: number | null;
+    domain_id: number | null;
+    domain_name: string | null;
 }
+
+export interface FailureDomain {
+    id: number;
+    name: string;
+    description: string | null;
+    created_at: string;
+    drives?: { id: number; mount_path: string; volume_label: string | null }[];
+}
+
+export type ResilienceState =
+    | 'unsafe_no_backup'
+    | 'unsafe_single_domain'
+    | 'safe_two_domains'
+    | 'over_replicated_but_fragile'
+    | 'over_replicated_and_resilient';
 
 export interface Root {
     id: number;
@@ -90,9 +107,12 @@ export interface MediaItem {
     status: 'auto' | 'verified' | 'needs_verification';
     created_at: string;
     copy_count: number;
+    resilience_state: ResilienceState | null;
+    domain_mapping_complete: boolean;
 }
 
 export interface MediaItemDetail extends MediaItem {
+    distinct_domains: number;
     files: {
         id: number;
         path: string;
@@ -104,6 +124,8 @@ export interface MediaItemDetail extends MediaItem {
         is_primary: boolean;
         root_path: string;
         drive_path: string;
+        domain_id: number | null;
+        domain_name: string | null;
     }[];
 }
 
@@ -112,6 +134,8 @@ export interface ItemStats {
     by_type: Record<string, number>;
     by_copy_count: Record<number, number>;
     needs_verification: number;
+    by_resilience_state: Record<ResilienceState, number>;
+    incomplete_domain_mapping: number;
 }
 
 export interface HashStatus {
@@ -415,3 +439,33 @@ export const exportApi = {
     getDuplicatesUrl: () => `${API_BASE}/exports/duplicates`,
 };
 
+// Failure Domains API
+export const failureDomainApi = {
+    async list(): Promise<{ domains: FailureDomain[]; unassigned_drives: number }> {
+        return request('GET', '/failure-domains');
+    },
+
+    async get(id: number): Promise<FailureDomain> {
+        return request('GET', `/failure-domains/${id}`);
+    },
+
+    async create(name: string, description?: string): Promise<FailureDomain> {
+        return request('POST', '/failure-domains', { name, description });
+    },
+
+    async update(id: number, name?: string, description?: string): Promise<FailureDomain> {
+        return request('PATCH', `/failure-domains/${id}`, { name, description });
+    },
+
+    async delete(id: number): Promise<{ message: string; id: number }> {
+        return request('DELETE', `/failure-domains/${id}`);
+    },
+
+    async assignDrive(domainId: number, driveId: number): Promise<{ message: string }> {
+        return request('POST', `/failure-domains/${domainId}/drives/${driveId}`);
+    },
+
+    async unassignDrive(domainId: number, driveId: number): Promise<{ message: string }> {
+        return request('DELETE', `/failure-domains/${domainId}/drives/${driveId}`);
+    },
+};

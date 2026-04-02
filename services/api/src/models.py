@@ -34,10 +34,30 @@ class Drive(BaseModel):
     created_at: datetime
     free_space: Optional[int] = None
     total_space: Optional[int] = None
+    domain_id: Optional[int] = None
+    domain_name: Optional[str] = None
 
 
 class DriveList(BaseModel):
     drives: list[Drive]
+
+
+# Failure Domain models
+class FailureDomainCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+
+class FailureDomain(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    created_at: datetime
+
+
+class FailureDomainList(BaseModel):
+    domains: list[FailureDomain]
+    unassigned_drives: int = 0
 
 
 # Root models

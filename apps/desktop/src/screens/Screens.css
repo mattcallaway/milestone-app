@@ -1274,3 +1274,264 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* ── Failure Domain / Resilience styles ─────────────────────────────────── */
+
+.badge-domain {
+    background: rgba(33, 150, 243, 0.15);
+    color: #2196f3;
+    border: 1px solid rgba(33, 150, 243, 0.3);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: background 0.2s;
+}
+
+.badge-domain:hover {
+    background: rgba(33, 150, 243, 0.25);
+}
+
+/* Resilience state badge — item detail */
+.resilience-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid;
+    border-radius: 10px;
+    margin: 12px 0;
+}
+
+.resilience-icon {
+    font-size: 1.4rem;
+}
+
+.resilience-label {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.resilience-sub {
+    font-size: 0.85rem;
+    color: #888;
+    margin-left: auto;
+}
+
+/* Warning when domain mapping is incomplete */
+.domain-incomplete-warning {
+    padding: 10px 14px;
+    background: rgba(255, 152, 0, 0.08);
+    border: 1px solid rgba(255, 152, 0, 0.4);
+    border-radius: 8px;
+    color: #ff9800;
+    font-size: 0.88rem;
+    margin: 8px 0 12px;
+}
+
+/* Failure Domains screen */
+.domain-coverage {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px 18px;
+    border-radius: 10px;
+    margin-bottom: 24px;
+}
+
+.domain-coverage.incomplete {
+    background: rgba(255, 152, 0, 0.07);
+    border: 1px solid rgba(255, 152, 0, 0.35);
+}
+
+.domain-coverage.complete {
+    background: rgba(76, 175, 80, 0.07);
+    border: 1px solid rgba(76, 175, 80, 0.35);
+}
+
+.coverage-icon {
+    font-size: 1.1rem;
+    margin-right: 6px;
+}
+
+.coverage-text {
+    font-size: 0.9rem;
+    color: #ccc;
+}
+
+.coverage-bar {
+    height: 6px;
+    background: #222;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+.coverage-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4caf50, #66bb6a);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+.domain-create-form {
+    background: #1a1a1a;
+    border: 1px solid #2a2a4a;
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 28px;
+}
+
+.domain-create-form h3 {
+    margin: 0 0 14px;
+    font-size: 1rem;
+    color: #aaa;
+    font-weight: 500;
+}
+
+.form-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+}
+
+.form-row .input {
+    flex: 1;
+    min-width: 180px;
+}
+
+.domains-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.domain-card {
+    background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
+    border: 1px solid #2a2a4a;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.domain-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid #2a2a4a;
+}
+
+.domain-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.domain-name {
+    font-size: 1rem;
+    color: #fff;
+}
+
+.domain-desc {
+    font-size: 0.88rem;
+    color: #888;
+}
+
+.domain-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.domain-drive-count {
+    font-size: 0.82rem;
+    color: #888;
+    padding: 2px 8px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 10px;
+}
+
+.domain-edit-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.domain-edit-row .input {
+    flex: 1;
+    min-width: 140px;
+}
+
+.domain-drives {
+    padding: 14px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.domain-drive-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+}
+
+.drive-path {
+    flex: 1;
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: #ddd;
+    word-break: break-all;
+}
+
+.drive-label {
+    font-size: 0.82rem;
+    color: #888;
+}
+
+.assign-drive-row {
+    margin-top: 4px;
+}
+
+.assign-drive-row select.input {
+    width: 100%;
+    max-width: 400px;
+    cursor: pointer;
+}
+
+/* Unassigned drives section */
+.unassigned-section {
+    margin-top: 36px;
+    padding: 18px 20px;
+    background: rgba(255, 87, 34, 0.05);
+    border: 1px solid rgba(255, 87, 34, 0.3);
+    border-radius: 10px;
+}
+
+.unassigned-section h3 {
+    margin: 0 0 8px;
+    font-size: 1rem;
+    color: #ff7043;
+}
+
+.unassigned-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.unassigned-drive-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+}

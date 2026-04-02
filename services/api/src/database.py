@@ -33,6 +33,33 @@ async def init_db() -> None:
         except Exception:
             pass  # column already exists — nothing to do
 
+        # Migration v2.1: add failure_domains table.
+        # schema.sql already has CREATE TABLE IF NOT EXISTS, so this is a
+        # no-op for fresh installs. For existing DBs that ran an older schema,
+        # executescript above will have already created it. Belt-and-suspenders.
+        try:
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS failure_domains (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT UNIQUE NOT NULL,
+                    description TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            await db.commit()
+        except Exception:
+            pass
+
+        # Migration v2.1: add domain_id column to existing drives tables.
+        try:
+            await db.execute(
+                "ALTER TABLE drives ADD COLUMN domain_id INTEGER"
+                " REFERENCES failure_domains(id) ON DELETE SET NULL"
+            )
+            await db.commit()
+        except Exception:
+            pass  # column already exists
+
 
 @asynccontextmanager
 async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:

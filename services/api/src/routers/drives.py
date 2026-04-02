@@ -96,13 +96,16 @@ async def register_drive(data: DriveRegister) -> Drive:
 
 @router.get("", response_model=DriveList)
 async def list_drives() -> DriveList:
-    """List all registered drives with status."""
+    """List all registered drives with status and domain info."""
     async with get_db() as db:
         cursor = await db.execute(
-            "SELECT id, mount_path, volume_serial, volume_label, created_at FROM drives"
+            """SELECT d.id, d.mount_path, d.volume_serial, d.volume_label,
+                      d.created_at, d.domain_id, fd.name as domain_name
+               FROM drives d
+               LEFT JOIN failure_domains fd ON d.domain_id = fd.id"""
         )
         rows = await cursor.fetchall()
-        
+
         drives = []
         for row in rows:
             free_space, total_space = get_disk_space(row["mount_path"])
@@ -113,9 +116,11 @@ async def list_drives() -> DriveList:
                 volume_label=row["volume_label"],
                 created_at=row["created_at"],
                 free_space=free_space,
-                total_space=total_space
+                total_space=total_space,
+                domain_id=row["domain_id"],
+                domain_name=row["domain_name"],
             ))
-        
+
         return DriveList(drives=drives)
 
 

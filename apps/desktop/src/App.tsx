@@ -9,8 +9,9 @@ import { ItemsScreen } from './screens/ItemsScreen';
 import { ItemDetailScreen } from './screens/ItemDetailScreen';
 import { OperationsScreen } from './screens/OperationsScreen';
 import { CleanupScreen } from './screens/CleanupScreen';
+import { FailureDomainsScreen } from './screens/FailureDomainsScreen';
 
-type Screen = 'dashboard' | 'drives' | 'roots' | 'scan' | 'library' | 'items' | 'item-detail' | 'operations' | 'cleanup';
+type Screen = 'dashboard' | 'drives' | 'roots' | 'scan' | 'library' | 'items' | 'item-detail' | 'operations' | 'cleanup' | 'failure-domains';
 
 interface ScreenParams {
     itemId?: number;
@@ -34,7 +35,7 @@ function App() {
             case 'dashboard':
                 return <DashboardScreen onNavigate={handleNavigate} />;
             case 'drives':
-                return <DrivesScreen />;
+                return <DrivesScreen onNavigate={handleNavigate} />;
             case 'roots':
                 return <RootsScreen />;
             case 'scan':
@@ -64,6 +65,8 @@ function App() {
                 return <OperationsScreen />;
             case 'cleanup':
                 return <CleanupScreen />;
+            case 'failure-domains':
+                return <FailureDomainsScreen />;
             default:
                 return <DashboardScreen onNavigate={handleNavigate} />;
         }

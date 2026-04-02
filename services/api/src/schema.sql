@@ -1,13 +1,26 @@
 -- SQLite schema for Milestone 2
 
+-- failure_domains: shared-risk buckets (same enclosure, NAS, location, etc.)
+-- Drives with no domain_id are considered "domain unknown" for resilience purposes.
+CREATE TABLE IF NOT EXISTS failure_domains (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- drives: registered storage drives
 CREATE TABLE IF NOT EXISTS drives (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     mount_path TEXT UNIQUE NOT NULL,
     volume_serial TEXT,
     volume_label TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    domain_id INTEGER,              -- NULL = domain not yet assigned
+    FOREIGN KEY (domain_id) REFERENCES failure_domains(id) ON DELETE SET NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_drives_domain_id ON drives(domain_id);
 
 -- roots: folders to scan within drives
 CREATE TABLE IF NOT EXISTS roots (

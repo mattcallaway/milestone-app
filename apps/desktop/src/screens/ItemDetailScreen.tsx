@@ -80,6 +80,17 @@ export function ItemDetailScreen({ itemId, onBack }: ItemDetailScreenProps) {
         }
     };
 
+    const getResilienceInfo = (state: string | undefined): { label: string; color: string; icon: string } => {
+        switch (state) {
+            case 'unsafe_no_backup':              return { label: 'No Backup',                  color: '#f44336', icon: '🔴' };
+            case 'unsafe_single_domain':          return { label: 'Single Domain',              color: '#ff5722', icon: '🟠' };
+            case 'safe_two_domains':              return { label: 'Safe — 2 Domains',           color: '#4caf50', icon: '🟢' };
+            case 'over_replicated_but_fragile':   return { label: 'Over-replicated (Fragile)',  color: '#ff9800', icon: '🟡' };
+            case 'over_replicated_and_resilient': return { label: 'Resilient',                  color: '#2196f3', icon: '🔵' };
+            default: return { label: 'Unknown', color: '#888', icon: '⚪' };
+        }
+    };
+
     const getTypeLabel = (type: string): string => {
         switch (type) {
             case 'movie': return '🎬 Movie';
@@ -87,6 +98,7 @@ export function ItemDetailScreen({ itemId, onBack }: ItemDetailScreenProps) {
             default: return '❓ Unknown';
         }
     };
+
 
     const getStatusColor = (status: string): string => {
         switch (status) {
@@ -122,6 +134,31 @@ export function ItemDetailScreen({ itemId, onBack }: ItemDetailScreenProps) {
                             </span>
                         </div>
 
+                        {/* Resilience state badge — primary safety signal */}
+                        {item.resilience_state && (() => {
+                            const { label, color, icon } = getResilienceInfo(item.resilience_state);
+                            return (
+                                <div className="resilience-badge" style={{ borderColor: color }}>
+                                    <span className="resilience-icon">{icon}</span>
+                                    <span className="resilience-label" style={{ color }}>{label}</span>
+                                    <span className="resilience-sub">
+                                        {item.copy_count} {item.copy_count === 1 ? 'copy' : 'copies'}
+                                        {item.distinct_domains !== undefined &&
+                                            `, ${item.distinct_domains} failure domain${item.distinct_domains !== 1 ? 's' : ''}`
+                                        }
+                                    </span>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Warn when domain mapping is incomplete */}
+                        {item.domain_mapping_complete === false && (
+                            <div className="domain-incomplete-warning">
+                                ⚠️ One or more drives hosting this item have no failure domain assigned.
+                                Resilience state may be more optimistic than reality.
+                            </div>
+                        )}
+
                         <div className="detail-meta">
                             {item.year && <span className="meta-item">Year: {item.year}</span>}
                             {item.season !== null && (
@@ -142,13 +179,23 @@ export function ItemDetailScreen({ itemId, onBack }: ItemDetailScreenProps) {
                         <div className="file-instances">
                             {item.files.map((file) => (
                                 <div key={file.id} className="file-instance">
-                                    <div className="file-instance-header">
-                                        <span className="file-drive">{file.drive_path}</span>
-                                        {file.is_primary && <span className="badge badge-primary">Primary</span>}
-                                        <span className={`hash-status hash-${file.hash_status}`}>
-                                            {file.hash_status}
-                                        </span>
-                                    </div>
+                                        <div className="file-instance-header">
+                                            <span className="file-drive">{file.drive_path}</span>
+                                            {/* Domain badge per file */}
+                                            {file.domain_name ? (
+                                                <span className="badge badge-domain" title="Failure domain">
+                                                    🏷️ {file.domain_name}
+                                                </span>
+                                            ) : (
+                                                <span className="badge badge-warning" title="No failure domain assigned">
+                                                    ⚠️ Unassigned
+                                                </span>
+                                            )}
+                                            {file.is_primary && <span className="badge badge-primary">Primary</span>}
+                                            <span className={`hash-status hash-${file.hash_status}`}>
+                                                {file.hash_status}
+                                            </span>
+                                        </div>
                                     <div className="file-path">{file.path}</div>
                                     <div className="file-details">
                                         <span>{formatBytes(file.size)}</span>

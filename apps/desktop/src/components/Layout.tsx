@@ -16,6 +16,7 @@ const navItems = [
     { id: 'roots', label: 'Roots', icon: '📁' },
     { id: 'scan', label: 'Scan', icon: '🔍' },
     { id: 'library', label: 'Library', icon: '📚' },
+    { id: 'failure-domains', label: 'Domains', icon: '🛡️' },
 ];
 
 export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {
