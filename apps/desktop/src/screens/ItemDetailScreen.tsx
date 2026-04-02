@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api, MediaItemDetail } from '../api';
 import { SidecarPanel } from '../components/SidecarPanel';
 import './Screens.css';
@@ -12,10 +12,9 @@ export function ItemDetailScreen({ itemId, onBack }: ItemDetailScreenProps) {
     const [item, setItem] = useState<MediaItemDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
     const [mergeTarget, setMergeTarget] = useState<string>('');
 
-    const loadItem = async () => {
+    const loadItem = useCallback(async () => {
         try {
             setLoading(true);
             const data = await api.getItem(itemId);
@@ -26,11 +25,11 @@ export function ItemDetailScreen({ itemId, onBack }: ItemDetailScreenProps) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [itemId]);
 
     useEffect(() => {
         loadItem();
-    }, [itemId]);
+    }, [loadItem]);
 
     const formatBytes = (bytes: number | null): string => {
         if (bytes === null) return '-';
@@ -242,7 +241,7 @@ export function ItemDetailScreen({ itemId, onBack }: ItemDetailScreenProps) {
                                 type="number"
                                 placeholder="Target item ID"
                                 value={mergeTarget}
-                                onChange={(e) => setMergeTarget(e.target.value)}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMergeTarget(e.target.value)}
                                 className="input input-sm"
                             />
                             <button

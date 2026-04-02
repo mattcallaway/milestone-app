@@ -12,24 +12,18 @@ import { CleanupScreen } from './screens/CleanupScreen';
 import { FailureDomainsScreen } from './screens/FailureDomainsScreen';
 import { SimulationScreen } from './screens/SimulationScreen';
 import { RiskScreen } from './screens/RiskScreen';
+import { PlanningScreen } from './screens/PlanningScreen';
+import { PlanReviewScreen } from './screens/PlanReviewScreen';
 
-type Screen = 'dashboard' | 'drives' | 'roots' | 'scan' | 'library' | 'items' | 'item-detail' | 'operations' | 'cleanup' | 'failure-domains' | 'simulation' | 'risk';
-
-interface ScreenParams {
-    itemId?: number;
-    type?: string;
-    min_copies?: number;
-    max_copies?: number;
-    status?: string;
-}
+import { Screen, ScreenParams, NavigateFunction } from './types';
 
 function App() {
     const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
     const [screenParams, setScreenParams] = useState<ScreenParams>({});
 
-    const handleNavigate = (screen: string, params?: Record<string, unknown>) => {
-        setScreenParams(params as ScreenParams || {});
-        setCurrentScreen(screen as Screen);
+    const handleNavigate: NavigateFunction = (screen, params) => {
+        setScreenParams(params || {});
+        setCurrentScreen(screen);
     };
 
     const renderScreen = () => {
@@ -72,7 +66,17 @@ function App() {
             case 'simulation':
                 return <SimulationScreen />;
             case 'risk':
-                return <RiskScreen />;
+                return <RiskScreen onNavigate={handleNavigate} />;
+            case 'planning':
+                return <PlanningScreen onNavigate={handleNavigate} />;
+            case 'plan-review':
+                return (
+                    <PlanReviewScreen
+                        planId={screenParams.planId!}
+                        onBack={() => handleNavigate('planning')}
+                        onNavigate={handleNavigate}
+                    />
+                );
             default:
                 return <DashboardScreen onNavigate={handleNavigate} />;
         }

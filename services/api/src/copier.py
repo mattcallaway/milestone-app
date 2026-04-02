@@ -263,13 +263,13 @@ async def create_copy_operation(
             if not dest_drive:
                 raise ValueError(f"Destination drive not found: {dest_drive_id}")
         
-        # Build destination path (mirror structure from source)
+        # Build destination path (PRESERVE relative structure from the root)
         source_full = source_file["path"]
-        source_mount = source_file["source_mount"]
-        relative_path = source_full
+        root_path = source_file["root_path"]
+        relative_path = os.path.relpath(source_full, root_path)
         
         if dest_path is None:
-            dest_path = os.path.join(dest_drive["mount_path"], os.path.basename(source_full))
+            dest_path = os.path.normpath(os.path.join(dest_drive["mount_path"], relative_path))
         
         # Check destination doesn't already exist
         if os.path.exists(dest_path):

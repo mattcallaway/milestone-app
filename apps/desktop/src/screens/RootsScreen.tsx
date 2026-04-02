@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api, Drive, Root } from '../api';
 import './Screens.css';
 
@@ -34,7 +34,7 @@ export function RootsScreen() {
 
     const handleAddRoot = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedDrive || !newPath.trim()) return;
+        if (selectedDrive === null || !newPath.trim()) return;
 
         try {
             setAdding(true);
@@ -68,11 +68,6 @@ export function RootsScreen() {
         }
     };
 
-    const getDriveName = (driveId: number): string => {
-        const drive = drives.find((d) => d.id === driveId);
-        return drive?.mount_path || 'Unknown';
-    };
-
     const rootsByDrive = drives.map((drive) => ({
         drive,
         roots: roots.filter((r) => r.drive_id === drive.id),
@@ -95,7 +90,7 @@ export function RootsScreen() {
                     <form className="add-form" onSubmit={handleAddRoot}>
                         <select
                             value={selectedDrive || ''}
-                            onChange={(e) => setSelectedDrive(Number(e.target.value) || null)}
+                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedDrive(Number(e.target.value) || null)}
                             className="input select"
                         >
                             <option value="">Select a drive...</option>

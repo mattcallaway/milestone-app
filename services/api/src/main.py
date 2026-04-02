@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings, is_write_enabled
 from .database import init_db
-from .routers import drives, roots, files, scan, items, hash, ops, cleanup, exports, failure_domains, simulation, risk, sidecars
+from .routers import drives, roots, files, scan, items, hash, ops, cleanup, exports, failure_domains, simulation, risk, sidecars, planning
 
 
 @asynccontextmanager
@@ -49,6 +49,7 @@ app.include_router(failure_domains.router)
 app.include_router(simulation.router)
 app.include_router(risk.router)
 app.include_router(sidecars.router)
+app.include_router(planning.router)
 
 
 @app.get("/")

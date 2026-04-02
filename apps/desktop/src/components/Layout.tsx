@@ -1,13 +1,14 @@
 import { ReactNode } from 'react';
+import { Screen } from '../types';
 import './Layout.css';
 
 interface LayoutProps {
     children: ReactNode;
-    currentScreen: string;
-    onNavigate: (screen: string) => void;
+    currentScreen: Screen;
+    onNavigate: (screen: Screen) => void;
 }
 
-const navItems = [
+const navItems: { id: Screen; label: string; icon: string }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'items', label: 'Items', icon: '🎬' },
     { id: 'operations', label: 'Operations', icon: '⚙️' },
@@ -19,6 +20,7 @@ const navItems = [
     { id: 'failure-domains', label: 'Domains', icon: '🛡️' },
     { id: 'simulation', label: 'Simulate', icon: '🧨' },
     { id: 'risk', label: 'Risk', icon: '📈' },
+    { id: 'planning', label: 'Planning', icon: '📋' },
 ];
 
 export function Layout({ children, currentScreen, onNavigate }: LayoutProps) {

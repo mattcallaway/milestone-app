@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { api, ItemStats } from '../api';
+import { NavigateFunction } from '../types';
 import './Screens.css';
 
 interface DashboardScreenProps {
-    onNavigate: (screen: string, params?: Record<string, unknown>) => void;
+    onNavigate: NavigateFunction;
 }
 
 export function DashboardScreen({ onNavigate }: DashboardScreenProps) {

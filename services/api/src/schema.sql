@@ -42,7 +42,6 @@ CREATE TABLE IF NOT EXISTS files (
     mtime REAL,
     ext TEXT,
     last_seen TIMESTAMP,
-    signature_stub TEXT,
     quick_sig TEXT,
     full_hash TEXT,
     hash_status TEXT DEFAULT 'pending',
@@ -124,3 +123,32 @@ CREATE TABLE IF NOT EXISTS user_rules (
 CREATE INDEX IF NOT EXISTS idx_operations_status ON operations(status);
 CREATE INDEX IF NOT EXISTS idx_operations_source ON operations(source_file_id);
 CREATE INDEX IF NOT EXISTS idx_user_rules_type ON user_rules(rule_type);
+
+-- plans: saved resilience / reduction / retirement blueprints
+CREATE TABLE IF NOT EXISTS plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,           -- 'protection', 'reduction', 'retirement'
+    status TEXT DEFAULT 'draft',  -- 'draft', 'executed', 'cancelled'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    executed_at TIMESTAMP
+);
+
+-- plan_items: individual actions within a plan
+CREATE TABLE IF NOT EXISTS plan_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id INTEGER NOT NULL,
+    media_item_id INTEGER NOT NULL,
+    source_file_id INTEGER,          -- can be NULL for complex multi-source ops?
+    dest_drive_id INTEGER,           -- can be NULL for 'delete'
+    action TEXT NOT NULL,            -- 'copy', 'move', 'delete'
+    is_included INTEGER DEFAULT 1,   -- checkbox on UI
+    estimated_size INTEGER,
+    FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE,
+    FOREIGN KEY (media_item_id) REFERENCES media_items(id) ON DELETE CASCADE,
+    FOREIGN KEY (source_file_id) REFERENCES files(id) ON DELETE SET NULL,
+    FOREIGN KEY (dest_drive_id) REFERENCES drives(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_plan_items_plan_id ON plan_items(plan_id);
+CREATE INDEX IF NOT EXISTS idx_plan_items_media_item_id ON plan_items(media_item_id);

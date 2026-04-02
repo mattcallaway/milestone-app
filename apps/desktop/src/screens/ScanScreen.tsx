@@ -71,12 +71,6 @@ export function ScanScreen() {
         }
     };
 
-    const formatDuration = (seconds: number | null): string => {
-        if (seconds === null) return '--';
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
 
     const isActive = status?.state === 'running' || status?.state === 'paused';
 

@@ -729,3 +729,72 @@ export const sidecarApi = {
         return request('GET', `/sidecars/report?limit=${limit}`);
     },
 };
+
+// ── Planning types ─────────────────────────────────────────────────────────────
+
+export type PlanType = 'protection' | 'reduction' | 'retirement';
+export type PlanStatus = 'draft' | 'executed' | 'cancelled';
+
+export interface PlanItem {
+    id: number;
+    plan_id: number;
+    media_item_id: number;
+    media_item_title: string | null;
+    source_file_id: number | null;
+    source_path: string | null;
+    dest_drive_id: number | null;
+    dest_drive_path: string | null;
+    dest_domain_id: number | null;
+    action: 'copy' | 'move' | 'delete';
+    is_included: boolean;
+    estimated_size: number | null;
+}
+
+export interface Plan {
+    id: number;
+    name: string;
+    type: PlanType;
+    status: PlanStatus;
+    created_at: string;
+    executed_at: string | null;
+    item_count: number;
+    total_size: number;
+}
+
+export interface PlanSummary {
+    plan: Plan;
+    items: PlanItem[];
+    impact: {
+        before: Record<string, number>;
+        after: Record<string, number>;
+    };
+}
+
+// Planning API
+export const planningApi = {
+    async listPlans(): Promise<Plan[]> {
+        return request('GET', '/planning/plans');
+    },
+
+    async createPlan(params: {
+        name: string;
+        type: PlanType;
+        drive_id?: number;
+        min_size_gb?: number;
+        min_copies?: number;
+    }): Promise<number> {
+        return request('POST', '/planning/plans', params);
+    },
+
+    async getPlan(id: number): Promise<PlanSummary> {
+        return request('GET', `/planning/plans/${id}`);
+    },
+
+    async toggleInclusion(planItemId: number, included: boolean): Promise<void> {
+        return request('PATCH', `/planning/items/${planItemId}/inclusion?included=${included}`);
+    },
+
+    async executePlan(id: number): Promise<void> {
+        return request('POST', `/planning/plans/${id}/execute`);
+    },
+};

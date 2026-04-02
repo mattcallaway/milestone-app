@@ -96,7 +96,6 @@ class FileItem(BaseModel):
     mtime: Optional[float] = None
     ext: Optional[str] = None
     last_seen: Optional[datetime] = None
-    signature_stub: Optional[str] = None
 
 
 class FileList(BaseModel):
@@ -134,3 +133,70 @@ class ScanStatus(BaseModel):
 
 class ScanControl(BaseModel):
     action: str = Field(..., pattern="^(pause|resume|cancel)$")
+
+
+# Planning models
+class PlanType(str, Enum):
+    PROTECTION = "protection"
+    REDUCTION = "reduction"
+    RETIREMENT = "retirement"
+
+
+class PlanStatus(str, Enum):
+    DRAFT = "draft"
+    EXECUTED = "executed"
+    CANCELLED = "cancelled"
+
+
+class OperationType(str, Enum):
+    COPY = "copy"
+    MOVE = "move"
+    DELETE = "delete"
+
+
+class OperationStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class PlanItem(BaseModel):
+    id: int
+    plan_id: int
+    media_item_id: int
+    media_item_title: Optional[str] = None
+    source_file_id: Optional[int] = None
+    source_path: Optional[str] = None
+    dest_drive_id: Optional[int] = None
+    dest_drive_path: Optional[str] = None
+    action: str  # copy, move, delete
+    is_included: bool
+    estimated_size: Optional[int] = None
+
+
+class Plan(BaseModel):
+    id: int
+    name: str
+    type: PlanType
+    status: PlanStatus
+    created_at: datetime
+    executed_at: Optional[datetime] = None
+    item_count: int = 0
+    total_size: int = 0
+
+
+class PlanSummary(BaseModel):
+    plan: Plan
+    items: list[PlanItem]
+    impact: dict  # summarized drive/domain space changes
+
+
+class CreatePlanRequest(BaseModel):
+    name: str
+    type: PlanType
+    drive_id: Optional[int] = None  # for retirement
+    min_size_gb: Optional[float] = None
+    min_copies: Optional[int] = None

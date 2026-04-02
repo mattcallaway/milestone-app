@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { sidecarApi, SidecarCopy, SidecarCompleteness } from '../api';
 import './Screens.css';
 
@@ -39,7 +39,7 @@ export function SidecarPanel({ itemId }: SidecarPanelProps) {
     const [expanded, setExpanded] = useState(false);
     const [includeArtwork, setIncludeArtwork] = useState(false);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         try {
             setLoading(true);
             const [sc, comp] = await Promise.all([
@@ -54,7 +54,7 @@ export function SidecarPanel({ itemId }: SidecarPanelProps) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [itemId]);
 
     const reloadCompleteness = async (artwork: boolean) => {
         try {
@@ -63,9 +63,9 @@ export function SidecarPanel({ itemId }: SidecarPanelProps) {
         } catch { /* ignore */ }
     };
 
-    useEffect(() => { load(); }, [itemId]);
+    useEffect(() => { load(); }, [load]);
 
-    const totalSidecars = copies.reduce((sum, c) => sum + c.sidecar_count, 0);
+    const totalSidecars = copies.reduce((sum: number, c: SidecarCopy) => sum + c.sidecar_count, 0);
     const cm = completeness ? COMPLETENESS_META[completeness.completeness] : null;
 
     return (
@@ -73,7 +73,7 @@ export function SidecarPanel({ itemId }: SidecarPanelProps) {
             {/* Header — always visible */}
             <div
                 className="sidecar-panel-header"
-                onClick={() => setExpanded(e => !e)}
+                onClick={() => setExpanded((e: boolean) => !e)}
                 id="sidecar-panel-toggle"
             >
                 <div className="sidecar-summary-left">
@@ -124,7 +124,7 @@ export function SidecarPanel({ itemId }: SidecarPanelProps) {
                                         <input
                                             type="checkbox"
                                             checked={includeArtwork}
-                                            onChange={e => {
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                                 setIncludeArtwork(e.target.checked);
                                                 reloadCompleteness(e.target.checked);
                                             }}
@@ -141,7 +141,7 @@ export function SidecarPanel({ itemId }: SidecarPanelProps) {
                                 </div>
                             ) : (
                                 <div className="sidecar-copies">
-                                    {copies.map((copy, idx) => {
+                                    {copies.map((copy) => {
                                         const missingNames = completeness?.drives?.[copy.drive_id]?.missing ?? [];
                                         return (
                                             <div key={copy.file_id} className="sidecar-copy-card">
@@ -218,7 +218,7 @@ export function SidecarPanel({ itemId }: SidecarPanelProps) {
                             {/* No sidecars anywhere */}
                             {totalSidecars === 0 && copies.length > 0 && (
                                 <div className="sidecar-empty-hint">
-                                    <p>No subtitle, metadata, or artwork files were detected alongside this item's video files.</p>
+                                    <p>No subtitle, metadata, or artwork files were detected alongside this item&apos;s video files.</p>
                                     <p className="hint">Companion files are detected by matching filenames in the same folder as the video.</p>
                                 </div>
                             )}

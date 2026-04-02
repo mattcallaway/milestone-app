@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
-import { api, Drive } from '../api';
+import React, { useState, useEffect } from 'react';
+import { api, Drive, planningApi } from '../api';
+import { NavigateFunction } from '../types';
 import './Screens.css';
 
 interface DrivesScreenProps {
-    onNavigate?: (screen: string) => void;
+    onNavigate: NavigateFunction;
 }
 
 export function DrivesScreen({ onNavigate }: DrivesScreenProps) {
@@ -117,8 +118,8 @@ export function DrivesScreen({ onNavigate }: DrivesScreenProps) {
                                         <span
                                             className="badge badge-domain"
                                             title="Failure domain"
-                                            onClick={() => onNavigate?.('failure-domains')}
-                                            style={{ cursor: onNavigate ? 'pointer' : 'default' }}
+                                            onClick={() => onNavigate('failure-domains')}
+                                            style={{ cursor: 'pointer' }}
                                         >
                                             🏷️ {drive.domain_name}
                                         </span>
@@ -126,8 +127,8 @@ export function DrivesScreen({ onNavigate }: DrivesScreenProps) {
                                         <span
                                             className="badge badge-warning"
                                             title="No failure domain assigned — resilience analysis incomplete"
-                                            onClick={() => onNavigate?.('failure-domains')}
-                                            style={{ cursor: onNavigate ? 'pointer' : 'default' }}
+                                            onClick={() => onNavigate('failure-domains')}
+                                            style={{ cursor: 'pointer' }}
                                         >
                                             ⚠️ No domain
                                         </span>
@@ -157,6 +158,27 @@ export function DrivesScreen({ onNavigate }: DrivesScreenProps) {
                                         Serial: {drive.volume_serial}
                                     </div>
                                 )}
+                                <div style={{ marginTop: '16px' }}>
+                                    <button 
+                                        className="btn btn-warning btn-sm" 
+                                        style={{ width: '100%', justifyContent: 'center' }}
+                                        onClick={async () => {
+                                             try {
+                                                const name = `Retirement Plan - ${drive.volume_label || drive.mount_path}`;
+                                                const planId = await planningApi.createPlan({ 
+                                                    name, 
+                                                    type: 'retirement',
+                                                    drive_id: drive.id
+                                                });
+                                                onNavigate?.('plan-review', { planId });
+                                             } catch (err) {
+                                                alert('Failed to create retirement plan: ' + err);
+                                             }
+                                        }}
+                                    >
+                                        🛠️ Plan Retirement
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     ))}

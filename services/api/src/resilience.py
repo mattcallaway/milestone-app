@@ -91,32 +91,44 @@ def compute_item_resilience(files: list[dict]) -> dict:
     Compute the full resilience summary for a media item given its file list.
 
     Each dict in `files` must have at least:
-        - 'domain_id':  Optional[int]  — the failure-domain ID of the drive,
-                        or None if the drive has no domain assigned.
+        - 'drive_id':   int             — ID of the drive holding the file
+        - 'domain_id':  Optional[int]   — domain ID of the drive, or None
 
     Returns a dict with:
         resilience_state          str
-        copy_count                int
+        copy_count                int   — TOTAL files
+        distinct_drives           int   — UNIQUE drives
         distinct_domains          int   — distinct non-None domain IDs
         domain_mapping_complete   bool  — True when every file's drive has a domain
     """
     copy_count = len(files)
+    drive_ids: set[int] = set()
     domain_ids: set[int] = set()
     mapping_complete = True
 
     for f in files:
+        # Check both drive_id and domain_id
+        drive_id = f.get("drive_id")
+        if drive_id is not None:
+            drive_ids.add(drive_id)
+
         did: Optional[int] = f.get("domain_id")
         if did is None:
             mapping_complete = False
         else:
             domain_ids.add(did)
 
-    distinct = len(domain_ids)
-    state = compute_resilience_state(copy_count, distinct)
+    distinct_drives = len(drive_ids)
+    distinct_domains = len(domain_ids)
+
+    # Use distinct_drives as the base "backup count" — if 2 files on 1 drive,
+    # the drive failure = 0 files. So we treat it as 1-copy for resilience state.
+    state = compute_resilience_state(distinct_drives, distinct_domains)
 
     return {
         "resilience_state": state,
         "copy_count": copy_count,
-        "distinct_domains": distinct,
+        "distinct_drives": distinct_drives,
+        "distinct_domains": distinct_domains,
         "domain_mapping_complete": mapping_complete,
     }

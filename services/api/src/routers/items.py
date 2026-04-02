@@ -85,7 +85,7 @@ async def list_items(
             item_ids = [row["id"] for row in rows]
             placeholders = ",".join("?" * len(item_ids))
             cursor = await db.execute(
-                f"""SELECT mif.media_item_id, d.domain_id
+                f"""SELECT mif.media_item_id, d.id as drive_id, d.domain_id
                     FROM media_item_files mif
                     JOIN files f ON mif.file_id = f.id
                     JOIN roots r ON f.root_id = r.id
@@ -95,12 +95,15 @@ async def list_items(
             )
             domain_rows = await cursor.fetchall()
 
-            # Group domain_ids by item_id
+            # Group info by item_id
             item_domains: dict[int, list[dict]] = {r["id"]: [] for r in rows}
             for dr in domain_rows:
                 mid = dr["media_item_id"]
                 if mid in item_domains:
-                    item_domains[mid].append({"domain_id": dr["domain_id"]})
+                    item_domains[mid].append({
+                        "drive_id": dr["drive_id"],
+                        "domain_id": dr["domain_id"]
+                    })
         else:
             item_domains = {}
 
@@ -186,7 +189,7 @@ async def item_stats() -> dict:
             item_ids = [r["id"] for r in all_items]
             placeholders = ",".join("?" * len(item_ids))
             cursor = await db.execute(
-                f"""SELECT mif.media_item_id, d.domain_id
+                f"""SELECT mif.media_item_id, d.id as drive_id, d.domain_id
                     FROM media_item_files mif
                     JOIN files f ON mif.file_id = f.id
                     JOIN roots r ON f.root_id = r.id
@@ -199,7 +202,10 @@ async def item_stats() -> dict:
             for dr in domain_rows:
                 mid = dr["media_item_id"]
                 if mid in item_domain_map:
-                    item_domain_map[mid].append({"domain_id": dr["domain_id"]})
+                    item_domain_map[mid].append({
+                        "drive_id": dr["drive_id"],
+                        "domain_id": dr["domain_id"]
+                    })
 
             for item_row in all_items:
                 file_domains = item_domain_map.get(item_row["id"], [])

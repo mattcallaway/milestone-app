@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { simulationApi, SimulationResult, SimulationItem, SimDrive, SimDomain } from '../api';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { simulationApi, SimulationResult, SimDrive, SimDomain } from '../api';
 import './Screens.css';
 
 type ScopeType = 'drive' | 'domain';
@@ -45,11 +45,7 @@ export function SimulationScreen() {
     const [sortDir, setSortDir] = useState<SortDir>('asc');
     const [filterSeverity, setFilterSeverity] = useState<string>('all');
 
-    useEffect(() => {
-        loadPicker();
-    }, [scopeType]);
-
-    const loadPicker = async () => {
+    const loadPicker = useCallback(async () => {
         try {
             setLoadingPicker(true);
             setSelectedId(null);
@@ -67,7 +63,11 @@ export function SimulationScreen() {
         } finally {
             setLoadingPicker(false);
         }
-    };
+    }, [scopeType]);
+
+    useEffect(() => {
+        loadPicker();
+    }, [loadPicker]);
 
     const runSimulation = async () => {
         if (!selectedId) return;
@@ -147,7 +147,6 @@ export function SimulationScreen() {
         </th>
     );
 
-    const pickerOptions = scopeType === 'drive' ? drives : domains;
 
     return (
         <div className="screen">

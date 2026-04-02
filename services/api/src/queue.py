@@ -5,6 +5,7 @@ import threading
 from typing import Optional, Callable
 from datetime import datetime
 from .database import get_db
+from .models import OperationStatus, OperationType
 
 
 # Queue state
@@ -36,11 +37,11 @@ async def get_pending_operations(limit: int = 10) -> list[dict]:
             FROM operations o
             LEFT JOIN files f ON o.source_file_id = f.id
             LEFT JOIN drives d ON o.dest_drive_id = d.id
-            WHERE o.status = 'pending'
+            WHERE o.status = ?
             ORDER BY o.created_at ASC
             LIMIT ?
             """,
-            (limit,)
+            (OperationStatus.PENDING.value, limit)
         )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
@@ -65,10 +66,10 @@ async def update_operation_status(
             updates.append("error = ?")
             params.append(error)
         
-        if status == "running":
+        if status == OperationStatus.RUNNING.value:
             updates.append("started_at = ?")
             params.append(datetime.now().isoformat())
-        elif status in ("completed", "failed", "cancelled"):
+        elif status in (OperationStatus.COMPLETED.value, OperationStatus.FAILED.value, OperationStatus.CANCELLED.value):
             updates.append("completed_at = ?")
             params.append(datetime.now().isoformat())
         
@@ -85,19 +86,17 @@ async def process_operation(op: dict, progress_callback: Optional[Callable] = No
     from .copier import safe_copy
     
     op_id = op["id"]
-    _queue_state["active_ops"].add(op_id)
+    # Removed: added in queue_worker to fix race condition
     
     try:
-        await update_operation_status(op_id, "running")
+        await update_operation_status(op_id, OperationStatus.RUNNING.value)
         
-        if op["type"] == "copy":
+        if op["type"] == OperationType.COPY.value:
             loop = asyncio.get_event_loop()
 
-            # Called from the event loop thread via call_soon_threadsafe in copier.py.
-            # asyncio.create_task is safe here since we are on the event loop.
             def _on_progress(bytes_done: int) -> None:
                 loop.create_task(
-                    update_operation_status(op_id, "running", progress=bytes_done)
+                    update_operation_status(op_id, OperationStatus.RUNNING.value, progress=bytes_done)
                 )
 
             success = await safe_copy(
@@ -108,10 +107,30 @@ async def process_operation(op: dict, progress_callback: Optional[Callable] = No
             )
             
             if success:
-                await update_operation_status(op_id, "completed", progress=op.get("total_size", 0))
+                await update_operation_status(op_id, OperationStatus.COMPLETED.value, progress=op.get("total_size", 0))
                 return True
             else:
-                await update_operation_status(op_id, "failed", error="Copy failed")
+                await update_operation_status(op_id, OperationStatus.FAILED.value, error="Copy failed")
+                return False
+        elif op["type"] == OperationType.DELETE.value:
+            import os
+            try:
+                path = op["source_path"]
+                if os.path.exists(path):
+                    os.remove(path)
+                
+                # Proactively remove from join table to avoid stale UI
+                async with get_db() as db:
+                    await db.execute(
+                        "DELETE FROM media_item_files WHERE file_id = ?",
+                        (op["source_file_id"],)
+                    )
+                    await db.commit()
+
+                await update_operation_status(op_id, OperationStatus.COMPLETED.value)
+                return True
+            except Exception as e:
+                await update_operation_status(op_id, OperationStatus.FAILED.value, error=f"Delete failed: {str(e)}")
                 return False
         else:
             await update_operation_status(op_id, "failed", error=f"Unknown operation type: {op['type']}")
@@ -146,7 +165,10 @@ async def queue_worker():
         
         # Start operations concurrently
         for op in pending:
-            if op["id"] not in _queue_state["active_ops"]:
+            op_id = op["id"]
+            if op_id not in _queue_state["active_ops"]:
+                # ADD IMMEDIATELY: prevents another worker pass from picking it up
+                _queue_state["active_ops"].add(op_id)
                 asyncio.create_task(process_operation(op))
         
         await asyncio.sleep(0.5)

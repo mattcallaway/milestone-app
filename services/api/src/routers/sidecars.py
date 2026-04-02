@@ -227,41 +227,81 @@ async def get_sidecar_report(limit: int = Query(50)) -> dict:
     """
     Scan all items and return a completeness report.
     Returns items with complete, partial, and no-sidecar coverage.
+    
+    Optimized to avoid N+1 query patterns.
     """
     async with get_db() as db:
+        # 1. Get the batch of items
         cursor = await db.execute(
             "SELECT id, title, type FROM media_items ORDER BY id LIMIT ?",
             (limit,),
         )
-        items = await cursor.fetchall()
+        items = [dict(r) for r in await cursor.fetchall()]
+        if not items:
+            return {
+                "total_scanned": 0, 
+                "complete": [], "partial": [], "no_sidecars": [],
+                "summary": {"complete_count": 0, "partial_count": 0, "no_sidecars_count": 0}
+            }
 
+        item_ids = [it["id"] for it in items]
+        
+        # 2. Batch-fetch ALL primary files for these items
+        placeholders = ",".join(["?"] * len(item_ids))
+        cursor = await db.execute(f"""
+            SELECT mif.media_item_id, f.id AS file_id, f.path, r.id AS root_id, d.id AS drive_id
+            FROM media_item_files mif
+            JOIN files f ON mif.file_id = f.id
+            JOIN roots r ON f.root_id = r.id
+            JOIN drives d ON r.drive_id = d.id
+            WHERE mif.media_item_id IN ({placeholders})
+        """, item_ids)
+        all_primaries = [dict(r) for r in await cursor.fetchall()]
+
+        # 3. Group primaries by item and collect unique directories to fetch
+        primaries_by_item: dict[int, list[dict]] = {it["id"]: [] for it in items}
+        dirs_to_fetch = set() # set of (root_id, directory)
+        
+        for pf in all_primaries:
+            iid = pf["media_item_id"]
+            if iid in primaries_by_item:
+                primaries_by_item[iid].append(pf)
+                dirs_to_fetch.add((pf["root_id"], _dir_of(pf["path"])))
+
+        # 4. Fetch sidecar candidates for each unique directory
+        # (Still one query per unique folder, but much fewer than before)
+        candidates_by_dir: dict[tuple[int, str], list[str]] = {}
+        for root_id, directory in dirs_to_fetch:
+            files = await _load_dir_files(db, root_id, directory)
+            candidates_by_dir[(root_id, directory)] = [f["path"] for f in files]
+
+        # 5. Process completeness in-memory
         complete_items: list[dict] = []
         partial_items: list[dict] = []
         no_sidecar_items: list[dict] = []
 
-        for row in items:
-            item_id = row["id"]
-            primary_files = await _load_item_files(db, item_id)
-            if not primary_files:
+        for item in items:
+            iid = item["id"]
+            item_primaries = primaries_by_item.get(iid, [])
+            if not item_primaries:
                 continue
 
             sidecars_by_drive: dict[int, list[dict]] = {}
-            for pf in primary_files:
-                directory = _dir_of(pf["path"])
-                dir_files = await _load_dir_files(db, pf["root_id"], directory)
-                all_paths = [f["path"] for f in dir_files]
+            for pf in item_primaries:
+                key = (pf["root_id"], _dir_of(pf["path"]))
+                all_paths = candidates_by_dir.get(key, [])
                 detected = detect_sidecars(all_paths, primary_paths=[pf["path"]])
                 sidecars_by_drive[pf["drive_id"]] = detected[0]["sidecars"] if detected else []
 
             result = compute_completeness(sidecars_by_drive)
             info = {
-                "id": item_id,
-                "title": row["title"],
-                "type": row["type"],
+                "id": iid,
+                "title": item["title"],
+                "type": item["type"],
                 "completeness": result["completeness"],
                 "total_unique_sidecars": result["total_unique_sidecars"],
                 "missing_on_any_drive": result["missing_on_any_drive"],
-                "copy_count": len(primary_files),
+                "copy_count": len(item_primaries),
             }
 
             if result["completeness"] == "complete":

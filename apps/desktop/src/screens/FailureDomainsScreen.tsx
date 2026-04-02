@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { api, failureDomainApi, FailureDomain, Drive } from '../api';
 import './Screens.css';
 
@@ -213,7 +213,7 @@ export function FailureDomainsScreen() {
                                 {(domain.drives ?? []).length === 0 ? (
                                     <p className="hint">No drives assigned yet.</p>
                                 ) : (
-                                    (domain.drives ?? []).map((drive: any) => (
+                                    (domain.drives ?? []).map((drive: { id: number; mount_path: string; volume_label: string | null }) => (
                                         <div key={drive.id} className="domain-drive-row">
                                             <span className="drive-icon">💾</span>
                                             <span className="drive-path">{drive.mount_path}</span>

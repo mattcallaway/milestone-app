@@ -2325,4 +2325,113 @@
     color: #666;
     padding: 6px 0;
 }
+
+/* Planning styles */
+.planning-screen .bulk-actions-card {
+    padding: 24px;
+    margin-bottom: 32px;
+}
+
+.bulk-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.bulk-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid #2a2a4a;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.bulk-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: #667eea;
+    transform: translateY(-2px);
+}
+
+.bulk-icon {
+    font-size: 2.5rem;
+}
+
+.bulk-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.bulk-info strong {
+    font-size: 1.1rem;
+    color: #fff;
+}
+
+.bulk-info span {
+    font-size: 0.9rem;
+    color: #888;
+}
+
+.impact-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 12px;
+    padding: 16px;
+    align-items: center;
+}
+
+.impact-header {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #666;
+    border-bottom: 1px solid #2a2a4a;
+    padding-bottom: 8px;
+}
+
+.text-green {
+    color: #4caf50;
+    font-weight: 600;
+}
+
+.text-highlight {
+    color: #fff;
+}
+
+.text-neutral {
+    color: #666;
+}
+
+.stat-unit {
+    display: block;
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 4px;
+}
+
+.badge-protection { background: rgba(102, 126, 234, 0.2); color: #667eea; }
+.badge-reduction { background: rgba(156, 39, 176, 0.2); color: #ce93d8; }
+.badge-retirement { background: rgba(255, 87, 34, 0.2); color: #ffab91; }
+
+.badge-copy { background: rgba(76, 175, 80, 0.2); color: #81c784; }
+.badge-move { background: rgba(33, 150, 243, 0.2); color: #64b5f6; }
+.badge-delete { background: rgba(244, 67, 54, 0.2); color: #e57373; }
+
+.status-tag {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-draft { background: #333; color: #888; }
+.status-executed { background: #1b5e20; color: #4caf50; }
+.status-cancelled { background: #b71c1c; color: #f44336; }
+
 

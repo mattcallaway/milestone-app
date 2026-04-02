@@ -1,25 +1,19 @@
 import { useState, useEffect } from 'react';
-import { riskApi, RiskSummary, RiskItem } from '../api';
+import { riskApi, RiskSummary, RiskItem, planningApi } from '../api';
+import { RISK_COLORS, HEALTH_COLORS, getRiskColor } from '../theme';
+import { NavigateFunction } from '../types';
 import './Screens.css';
 
-const RISK_COLORS: Record<string, string> = {
-    Critical: '#f44336',
-    High: '#ff5722',
-    Medium: '#ff9800',
-    Low: '#ffc107',
-    Minimal: '#4caf50',
-};
-
 const HEALTH_META: Record<string, { icon: string; color: string; label: string }> = {
-    healthy:              { icon: '✅', color: '#4caf50', label: 'Healthy' },
-    warning:              { icon: '⚠️', color: '#ff9800', label: 'Warning' },
-    degraded:             { icon: '🔴', color: '#f44336', label: 'Degraded' },
-    avoid_for_new_copies: { icon: '🚫', color: '#ff5722', label: 'Avoid for New Copies' },
+    healthy:              { icon: '✅', color: HEALTH_COLORS.healthy, label: 'Healthy' },
+    warning:              { icon: '⚠️', color: HEALTH_COLORS.warning, label: 'Warning' },
+    degraded:             { icon: '🔴', color: HEALTH_COLORS.degraded, label: 'Degraded' },
+    avoid_for_new_copies: { icon: '🚫', color: HEALTH_COLORS.avoid_for_new_copies, label: 'Avoid for New Copies' },
 };
 
 function RiskBar({ score }: { score: number }) {
     const pct = Math.min(100, score);
-    const color = score >= 70 ? '#f44336' : score >= 50 ? '#ff5722' : score >= 30 ? '#ff9800' : score >= 10 ? '#ffc107' : '#4caf50';
+    const color = getRiskColor(score);
     return (
         <div className="risk-bar-wrapper">
             <div className="risk-bar-track">
@@ -41,7 +35,7 @@ function formatBytes(bytes: number | null): string {
     return `${v.toFixed(1)} ${units[u]}`;
 }
 
-export function RiskScreen() {
+export function RiskScreen({ onNavigate }: { onNavigate: NavigateFunction }) {
     const [data, setData] = useState<RiskSummary | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -67,10 +61,30 @@ export function RiskScreen() {
     return (
         <div className="screen">
             <div className="screen-header">
-                <h2>📊 Risk Dashboard</h2>
-                <p className="subtitle">
-                    Health-aware risk scoring across your library — showing which items need attention most urgently.
-                </p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                        <h2>📊 Risk Dashboard</h2>
+                        <p className="subtitle">
+                            Health-aware risk scoring across your library — showing which items need attention most urgently.
+                        </p>
+                    </div>
+                    <div className="header-actions">
+                        <button 
+                            className="btn btn-primary"
+                            onClick={async () => {
+                                try {
+                                    const name = `Protection Plan - ${new Date().toLocaleString()}`;
+                                    const planId = await planningApi.createPlan({ name, type: 'protection' });
+                                    onNavigate('plan-review', { planId });
+                                } catch (err) {
+                                    alert('Failed to create plan: ' + err);
+                                }
+                            }}
+                        >
+                            🛡️ Plan Protection
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {error && <div className="error-banner">{error}</div>}

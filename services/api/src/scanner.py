@@ -95,7 +95,7 @@ async def scan_directory(
                     await db.commit()  # persist progress for files processed so far
                     return stats
                 
-                filepath = os.path.join(dirpath, filename)
+                filepath = os.path.normpath(os.path.join(dirpath, filename))
                 try:
                     stat = os.stat(filepath)
                     size = stat.st_size
