@@ -60,6 +60,15 @@ async def init_db() -> None:
         except Exception:
             pass  # column already exists
 
+        # Migration v2.3: add health_status column to drives.
+        try:
+            await db.execute(
+                "ALTER TABLE drives ADD COLUMN health_status TEXT NOT NULL DEFAULT 'healthy'"
+            )
+            await db.commit()
+        except Exception:
+            pass  # column already exists
+
 
 @asynccontextmanager
 async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:

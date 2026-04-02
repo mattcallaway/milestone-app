@@ -26,6 +26,13 @@ class DriveRegister(BaseModel):
     mount_path: str = Field(..., description="Mount path of the drive (e.g., C:\\ or /mnt/data)")
 
 
+class DriveHealth(str, Enum):
+    HEALTHY = "healthy"
+    WARNING = "warning"
+    DEGRADED = "degraded"
+    AVOID = "avoid_for_new_copies"
+
+
 class Drive(BaseModel):
     id: int
     mount_path: str
@@ -36,6 +43,7 @@ class Drive(BaseModel):
     total_space: Optional[int] = None
     domain_id: Optional[int] = None
     domain_name: Optional[str] = None
+    health_status: str = "healthy"
 
 
 class DriveList(BaseModel):

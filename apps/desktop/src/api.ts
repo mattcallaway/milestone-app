@@ -550,3 +550,84 @@ export const simulationApi = {
         return request('GET', `/simulation/domain/${domainId}`);
     },
 };
+
+// ── Risk & Placement types ─────────────────────────────────────────────────────
+
+export type DriveHealth = 'healthy' | 'warning' | 'degraded' | 'avoid_for_new_copies';
+
+export interface RiskItem {
+    id: number;
+    title: string;
+    type: string;
+    resilience_state: string | null;
+    copy_count: number;
+    score: number;
+    label: string;
+    color: string;
+    recommended_action: string;
+    total_size_bytes: number;
+    drive_ids: number[];
+}
+
+export interface RiskDriveEntry {
+    drive_id: number;
+    mount_path: string;
+    volume_label: string | null;
+    health_status: DriveHealth;
+    at_risk_items: number;
+}
+
+export interface RiskSummary {
+    top_risk_items: RiskItem[];
+    biggest_vulnerable: RiskItem[];
+    fragile_drives: RiskDriveEntry[];
+}
+
+export interface ItemRisk {
+    item_id: number;
+    title: string;
+    score: number;
+    label: string;
+    color: string;
+    resilience_state: string | null;
+    copy_count: number;
+    total_size_bytes: number;
+    base_score: number;
+    health_modifier: number;
+    verification_modifier: number;
+    domain_modifier: number;
+    size_bonus: number;
+    factors: string[];
+    recommended_action: string;
+    improvement_if_acted: number;
+}
+
+export interface PlacementSuggestion {
+    drive_id: number;
+    mount_path: string;
+    volume_label: string | null;
+    domain_id: number | null;
+    health_status: DriveHealth;
+    free_space: number;
+    placement_score: number;
+    reason: string;
+}
+
+// Risk API
+export const riskApi = {
+    async getSummary(limit: number = 10): Promise<RiskSummary> {
+        return request('GET', `/risk/summary?limit=${limit}`);
+    },
+
+    async getItemRisk(itemId: number): Promise<ItemRisk> {
+        return request('GET', `/risk/item/${itemId}`);
+    },
+
+    async setDriveHealth(driveId: number, status: DriveHealth): Promise<{ drive_id: number; health_status: DriveHealth }> {
+        return request('PATCH', `/drives/${driveId}/health`, { status });
+    },
+
+    async getPlacement(itemId: number): Promise<{ item_id: number; item_title: string; resilience_state: string | null; suggestions: PlacementSuggestion[] }> {
+        return request('GET', `/risk/placement/${itemId}`);
+    },
+};

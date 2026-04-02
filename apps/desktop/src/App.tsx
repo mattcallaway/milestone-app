@@ -11,8 +11,9 @@ import { OperationsScreen } from './screens/OperationsScreen';
 import { CleanupScreen } from './screens/CleanupScreen';
 import { FailureDomainsScreen } from './screens/FailureDomainsScreen';
 import { SimulationScreen } from './screens/SimulationScreen';
+import { RiskScreen } from './screens/RiskScreen';
 
-type Screen = 'dashboard' | 'drives' | 'roots' | 'scan' | 'library' | 'items' | 'item-detail' | 'operations' | 'cleanup' | 'failure-domains' | 'simulation';
+type Screen = 'dashboard' | 'drives' | 'roots' | 'scan' | 'library' | 'items' | 'item-detail' | 'operations' | 'cleanup' | 'failure-domains' | 'simulation' | 'risk';
 
 interface ScreenParams {
     itemId?: number;
@@ -70,6 +71,8 @@ function App() {
                 return <FailureDomainsScreen />;
             case 'simulation':
                 return <SimulationScreen />;
+            case 'risk':
+                return <RiskScreen />;
             default:
                 return <DashboardScreen onNavigate={handleNavigate} />;
         }

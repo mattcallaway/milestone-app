@@ -100,7 +100,8 @@ async def list_drives() -> DriveList:
     async with get_db() as db:
         cursor = await db.execute(
             """SELECT d.id, d.mount_path, d.volume_serial, d.volume_label,
-                      d.created_at, d.domain_id, fd.name as domain_name
+                      d.created_at, d.domain_id, fd.name as domain_name,
+                      COALESCE(d.health_status, 'healthy') as health_status
                FROM drives d
                LEFT JOIN failure_domains fd ON d.domain_id = fd.id"""
         )
@@ -119,6 +120,7 @@ async def list_drives() -> DriveList:
                 total_space=total_space,
                 domain_id=row["domain_id"],
                 domain_name=row["domain_name"],
+                health_status=row["health_status"],
             ))
 
         return DriveList(drives=drives)
